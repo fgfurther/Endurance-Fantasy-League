@@ -39,6 +39,9 @@ class Activity(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     intervals_activity_id = Column(String, unique=True, index=True, nullable=False)
+
+    sleep_multiplier = Column(Float, default=1.0)  # множитель от продолжительности сна
+    sleep_secs = Column(Integer, nullable=True)    # сколько спали в эту ночь (для UI)
     
     # Activity data (из Intervals.icu)
     name = Column(String)
@@ -79,4 +82,39 @@ class Activity(Base):
     __table_args__ = (
         Index('idx_activities_user_date', 'user_id', 'start_date'),
         Index('idx_activities_intervals_id', 'intervals_activity_id'),
+    )
+
+
+
+class Wellness(Base):
+    __tablename__ = "wellness"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    date = Column(String, nullable=False, index=True)  # YYYY-MM-DD из Intervals (поле id)
+
+    sleep_secs = Column(Integer, nullable=True)
+    sleep_score = Column(Float, nullable=True)
+    sleep_quality = Column(Integer, nullable=True)
+    avg_sleeping_hr = Column(Float, nullable=True)
+    resting_hr = Column(Integer, nullable=True)
+    hrv = Column(Float, nullable=True)
+    fatigue = Column(Integer, nullable=True)
+    soreness = Column(Integer, nullable=True)
+    stress = Column(Integer, nullable=True)
+    mood = Column(Integer, nullable=True)
+    readiness = Column(Float, nullable=True)
+    weight = Column(Float, nullable=True)
+    ctl = Column(Float, nullable=True)
+    atl = Column(Float, nullable=True)
+
+    # XP за сон (если начисляем)
+    sleep_xp = Column(Float, default=0.0)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", backref="wellness_records")
+
+    __table_args__ = (
+        Index("idx_wellness_user_date", "user_id", "date", unique=True),
     )

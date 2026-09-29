@@ -4,8 +4,34 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Zap, Activity, TrendingUp, Calendar, Trophy } from "lucide-react";
 import axios from "axios";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from "recharts";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+function XpTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="bg-gray-900 border border-indigo-500/50 rounded-lg p-3 shadow-xl text-sm min-w-[180px]">
+      <p className="text-white font-medium mb-1">{d.name}</p>
+      <p className="text-gray-400 text-xs mb-2">
+        {d.date} · {d.sport} · {d.distance} км
+      </p>
+      <p className="text-yellow-400 font-bold text-lg">+{d.xp} XP</p>
+      <p className="text-xs text-gray-500 mt-1">
+        IF ×{Number(d.intensityMult).toFixed(2)} · сон ×{Number(d.sleepMult).toFixed(2)}
+      </p>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const [userData, setUserData] = useState<any>(null);
@@ -20,6 +46,27 @@ export default function Dashboard() {
       console.error("Ошибка загрузки:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const [resetting, setResetting] = useState(false);
+
+  const handleReset = async () => {
+    const ok = window.confirm(
+      "Удалить все тренировки и обнулить XP? Это действие нельзя отменить."
+    );
+    if (!ok) return;
+
+    setResetting(true);
+    try {
+      await axios.delete(`${API_URL}/api/reset`);
+      setUserData(null); // вернёмся к экрану «подключить»
+      // или: await fetchUser(); — если хочешь остаться на дашборде с нулями
+    } catch (error) {
+      console.error("Ошибка очистки:", error);
+      alert("Не удалось очистить данные");
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -63,6 +110,20 @@ export default function Dashboard() {
     );
   }
 
+  // График: последние тренировки от старых к новым
+  const chartData = [...(userData.recent_activities || [])]
+    .slice()
+    .reverse()
+    .map((act: any) => ({
+      date: act.date || "",
+      xp: Math.round(Number(act.xp) || 0),
+      name: act.name || "Тренировка",
+      sport: act.sport || "",
+      distance: act.distance_km ?? 0,
+      sleepMult: act.sleep_multiplier ?? 1,
+      intensityMult: act.intensity_multiplier ?? 1,
+    }));
+
   const xpProgress = (userData.user.total_xp % 100); // Упрощенный прогресс для демо
 
   return (
@@ -76,15 +137,25 @@ export default function Dashboard() {
             </h1>
             <p className="text-gray-400 mt-2">Твой прогресс в Fantasy League</p>
           </div>
-          <button
-            onClick={handleSync}
-            disabled={syncing}
-            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-lg font-medium transition-all flex items-center gap-2 disabled:opacity-50"
-          >
-            <Activity className="w-5 h-5" />
-            {syncing ? "Обновление..." : "Синхронизировать"}
-          </button>
-            <a href="/" className="text-sm text-gray-400 hover:text-white ml-4">← На главную</a>
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-lg font-medium transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              <Activity className="w-5 h-5" />
+              {syncing ? "Обновление..." : "Синхронизировать"}
+            </button>
+
+            <button
+              onClick={handleReset}
+              disabled={resetting || syncing}
+              className="px-6 py-3 bg-red-600/80 hover:bg-red-500 rounded-lg font-medium transition-all flex items-center gap-2 disabled:opacity-50 border border-red-500/40"
+            >
+              {resetting ? "Очистка..." : "🗑 Очистить данные"}
+            </button>
+              <a href="/" className="text-sm text-gray-400 hover:text-white ml-4">← На главную</a>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -139,6 +210,42 @@ export default function Dashboard() {
           </motion.div>
         </div>
 
+        {/* ДЕМО: Лидерборд (покажем, как это будет выглядеть) */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
+          className="bg-gradient-to-br from-indigo-900/50 to-purple-900/50 backdrop-blur-sm border border-indigo-500/30 rounded-xl p-6"
+        >
+          <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-yellow-400" />
+            Глобальный рейтинг (Демо)
+          </h3>
+          <div className="space-y-2">
+            {[
+              { rank: 1, name: "Alex Cyclist", level: 12, xp: 14500, isYou: false },
+              { rank: 2, name: "Maria Runner", level: 9, xp: 8200, isYou: false },
+              { rank: 3, name: userData.user.name, level: userData.user.level, xp: Math.round(userData.user.total_xp), isYou: true },
+              { rank: 4, name: "Ivan Swimmer", level: 5, xp: 2100, isYou: false },
+            ].map((player) => (
+              <div key={player.rank} className={`flex justify-between items-center p-3 rounded-lg ${player.isYou ? 'bg-yellow-500/20 border border-yellow-500/50' : 'bg-white/5'}`}>
+                <div className="flex items-center gap-3">
+                  <span className={`font-bold w-6 text-center ${player.rank <= 3 ? 'text-yellow-400' : 'text-gray-400'}`}>#{player.rank}</span>
+                  <div>
+                    <p className={`font-medium ${player.isYou ? 'text-yellow-300' : 'text-white'}`}>
+                      {player.name} {player.isYou && '(Вы)'}
+                    </p>
+                    <p className="text-xs text-gray-400">Level {player.level}</p>
+                  </div>
+                </div>
+                <span className="font-mono text-indigo-300">{player.xp.toLocaleString()} XP</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-4 text-center">* В полной версии здесь будут реальные данные всех пользователей</p>
+        </motion.div>
+
+
+
+
         {/* График прогресса XP */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
@@ -148,9 +255,45 @@ export default function Dashboard() {
             <TrendingUp className="w-5 h-5 text-indigo-400" />
             Динамика получения XP
           </h3>
-          <div className="h-64 w-full flex items-center justify-center text-gray-500">
-            {/* Здесь будет график. Пока заглушка, но мы его оживим на следующем шаге */}
-            <p>📈 График активности (готовится к интеграции с Recharts)</p>
+          <div className="h-64 w-full">
+            {chartData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-gray-500">
+                Нет данных для графика. Нажми «Синхронизировать».
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="xpFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#818cf8" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="#818cf8" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff15" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fill: "#9ca3af", fontSize: 12 }}
+                    axisLine={{ stroke: "#ffffff20" }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fill: "#9ca3af", fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={40}
+                  />
+                  <Tooltip content={<XpTooltip />} cursor={{ stroke: "#818cf8", strokeWidth: 1 }} />
+                  <Area
+                    type="monotone"
+                    dataKey="xp"
+                    stroke="#818cf8"
+                    strokeWidth={2}
+                    fill="url(#xpFill)"
+                    activeDot={{ r: 6, fill: "#a5b4fc", stroke: "#312e81", strokeWidth: 2 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </motion.div>
 
@@ -178,6 +321,13 @@ export default function Dashboard() {
                   multiplier >= 1.0 ? ' Средняя' :
                   multiplier >= 0.7 ? '🌿 Низкая' :
                   '💤 Восстановление';
+
+                const sleepMult = Number(act.sleep_multiplier ?? 1);
+                const sleepColor =
+                  sleepMult >= 1.4 ? "text-cyan-300" :
+                  sleepMult >= 1.0 ? "text-cyan-400" :
+                  sleepMult >= 0.7 ? "text-yellow-400" :
+                  "text-orange-400";
 
                 return (
                   <div 
@@ -224,6 +374,13 @@ export default function Dashboard() {
                               {multiplierLabel}
                             </span>
                           </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400">Сон:</span>
+                            <span className="font-mono font-bold text-cyan-400">
+                              {act.sleep_hours != null ? `${act.sleep_hours}ч ` : ""}
+                              ×{Number(act.sleep_multiplier ?? 1).toFixed(2)}
+                            </span>
+                          </div>
                           <div className="border-t border-gray-700 pt-2 flex justify-between">
                             <span className="text-gray-400">Итого:</span>
                             <span className="text-yellow-400 font-bold font-mono">
@@ -244,38 +401,7 @@ export default function Dashboard() {
           )}
         </motion.div>
 
-        {/* ДЕМО: Лидерборд (покажем, как это будет выглядеть) */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
-          className="bg-gradient-to-br from-indigo-900/50 to-purple-900/50 backdrop-blur-sm border border-indigo-500/30 rounded-xl p-6"
-        >
-          <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-yellow-400" />
-            Глобальный рейтинг (Демо)
-          </h3>
-          <div className="space-y-2">
-            {[
-              { rank: 1, name: "Alex Cyclist", level: 12, xp: 14500, isYou: false },
-              { rank: 2, name: "Maria Runner", level: 9, xp: 8200, isYou: false },
-              { rank: 3, name: userData.user.name, level: userData.user.level, xp: Math.round(userData.user.total_xp), isYou: true },
-              { rank: 4, name: "Ivan Swimmer", level: 5, xp: 2100, isYou: false },
-            ].map((player) => (
-              <div key={player.rank} className={`flex justify-between items-center p-3 rounded-lg ${player.isYou ? 'bg-yellow-500/20 border border-yellow-500/50' : 'bg-white/5'}`}>
-                <div className="flex items-center gap-3">
-                  <span className={`font-bold w-6 text-center ${player.rank <= 3 ? 'text-yellow-400' : 'text-gray-400'}`}>#{player.rank}</span>
-                  <div>
-                    <p className={`font-medium ${player.isYou ? 'text-yellow-300' : 'text-white'}`}>
-                      {player.name} {player.isYou && '(Вы)'}
-                    </p>
-                    <p className="text-xs text-gray-400">Level {player.level}</p>
-                  </div>
-                </div>
-                <span className="font-mono text-indigo-300">{player.xp.toLocaleString()} XP</span>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-gray-500 mt-4 text-center">* В полной версии здесь будут реальные данные всех пользователей</p>
-        </motion.div>
+        
       </div>
     </main>
   );

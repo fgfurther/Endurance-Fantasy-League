@@ -1,158 +1,344 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..models import User, Activity
-from ..services.intervals import fetch_athlete_activities, calculate_xp
+from ..models import User, Activity, Wellness
+from ..services.intervals import (
+    fetch_athlete_activities,
+    fetch_athlete_activities_csv,
+    fetch_wellness,
+    calculate_xp,
+    sleep_multiplier,
+)
 from ..config import get_settings
 from datetime import datetime
+from typing import Optional
 
 router = APIRouter(prefix="/api", tags=["Sync"])
 settings = get_settings()
 
+def _parse_activity(act: dict) -> dict | None:
+    """Нормализует активность из JSON или CSV в единый dict."""
+    act = {str(k).replace("\ufeff", "").strip(): v for k, v in act.items()}
+
+    act_id = str(act.get("id") or act.get("icu_id") or "").strip()
+    if not act_id:
+        return None
+
+    sport_type = str(act.get("type") or act.get("activity_type") or "WORKOUT").upper()
+    act_name = act.get("name") or "Без названия"
+
+    def _f(key, default=0.0):
+        try:
+            return float(act.get(key) or default)
+        except (TypeError, ValueError):
+            return float(default)
+
+    def _i(key, default=0):
+        try:
+            return int(float(act.get(key) or default))
+        except (TypeError, ValueError):
+            return int(default)
+
+    distance_m = _f("distance")
+    moving_time_s = _i("moving_time")
+    elevation_m = _f("total_elevation_gain") or _f("elevation_gain")
+    training_load = _f("icu_training_load") or _f("training_load")
+    intensity = _f("icu_intensity") or _f("intensity")
+
+    # IF иногда приходит как проценты (85) вместо 0.85
+    if intensity > 3.0:
+        intensity = intensity / 100.0
+    intensity_multiplier = round(max(0.5, min(2.0, intensity if intensity > 0 else 1.0)), 2)
+
+    if training_load > 0:
+        base_xp = training_load * 1.5
+    else:
+        base_xp = calculate_xp(sport_type, distance_m, elevation_m, moving_time_s)
+
+    xp_earned = round(base_xp * intensity_multiplier, 2)
+    base_xp = round(base_xp, 2)
+
+    start_date_str = (
+        act.get("start_date_local")
+        or act.get("start_date")
+        or act.get("startDateLocal")
+        or ""
+    )
+    try:
+        start_date = (
+            datetime.fromisoformat(str(start_date_str).replace("Z", "+00:00"))
+            if start_date_str
+            else datetime.utcnow()
+        )
+    except Exception:
+        start_date = datetime.utcnow()
+
+    return {
+        "intervals_activity_id": act_id,
+        "name": act_name,
+        "sport_type": sport_type,
+        "distance": distance_m,
+        "moving_time": moving_time_s,
+        "elevation_gain": elevation_m,
+        "training_load": training_load,
+        "intensity": intensity,
+        "base_xp": base_xp,
+        "intensity_multiplier": intensity_multiplier,
+        "xp_earned": xp_earned,
+        "start_date": start_date,
+        "average_heartrate": _f("average_heartrate") or _f("avg_hr"),
+        "average_watts": _f("average_watts") or _f("icu_average_watts"),
+        "normalized_power": _f("normalized_power") or _f("icu_weighted_avg_watts"),
+    }
+
+
+def _has_real_data(parsed: dict) -> bool:
+    """False = Strava-заглушка или пустая запись."""
+    if not parsed:
+        return False
+    name = (parsed.get("name") or "").strip()
+    if name and name not in ("Без названия", "Untitled", "Workout"):
+        return True
+    if (parsed.get("distance") or 0) > 0:
+        return True
+    if (parsed.get("moving_time") or 0) > 0:
+        return True
+    if (parsed.get("training_load") or 0) > 0:
+        return True
+    if (parsed.get("xp_earned") or 0) > 0:
+        return True
+    return False
+
+
+async def _sync_wellness_for_user(db, athlete_user, oldest, newest) -> dict:
+    """Тянет wellness, пишет в БД, возвращает { 'YYYY-MM-DD': sleep_secs }."""
+    records = await fetch_wellness(oldest=oldest, newest=newest)
+    sleep_by_date: dict[str, int] = {}
+
+    for row in records:
+        if not isinstance(row, dict):
+            continue
+        date_str = str(row.get("id") or row.get("date") or "").strip()[:10]
+        if len(date_str) < 10:
+            continue
+
+        raw_sleep = row.get("sleepSecs") if row.get("sleepSecs") is not None else row.get("sleep_secs")
+        try:
+            secs = int(raw_sleep) if raw_sleep is not None else None
+        except (TypeError, ValueError):
+            secs = None
+
+        if secs is not None and secs > 0:
+            sleep_by_date[date_str] = secs
+
+        existing = (
+            db.query(Wellness)
+            .filter(Wellness.user_id == athlete_user.id, Wellness.date == date_str)
+            .first()
+        )
+        if existing:
+            if secs is not None:
+                existing.sleep_secs = secs
+            existing.sleep_score = _safe_float(row.get("sleepScore") or row.get("sleep_score"))
+            existing.hrv = _safe_float(row.get("hrv"))
+            existing.resting_hr = _safe_int(row.get("restingHR") or row.get("resting_hr"))
+            existing.ctl = _safe_float(row.get("ctl"))
+            existing.atl = _safe_float(row.get("atl"))
+        else:
+            db.add(
+                Wellness(
+                    user_id=athlete_user.id,
+                    date=date_str,
+                    sleep_secs=secs,
+                    sleep_score=_safe_float(row.get("sleepScore") or row.get("sleep_score")),
+                    hrv=_safe_float(row.get("hrv")),
+                    resting_hr=_safe_int(row.get("restingHR") or row.get("resting_hr")),
+                    ctl=_safe_float(row.get("ctl")),
+                    atl=_safe_float(row.get("atl")),
+                )
+            )
+
+    db.commit()
+    return sleep_by_date
+
+
+def _safe_float(v):
+    try:
+        return float(v) if v is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_int(v):
+    try:
+        return int(float(v)) if v is not None else None
+    except (TypeError, ValueError):
+        return None
 
 @router.post("/sync")
-async def sync_activities(db: Session = Depends(get_db)):
+async def sync_activities(
+    oldest: str | None = None,
+    newest: str | None = None,
+    db: Session = Depends(get_db),
+):
     """Синхронизирует тренировки из Intervals.icu и начисляет XP"""
+    athlete_user = None  # не называем user до присвоения из БД
     try:
-        activities_data = await fetch_athlete_activities()
-        
+        activities_data = await fetch_athlete_activities(oldest=oldest, newest=newest)
+        if not activities_data:
+            activities_data = await fetch_athlete_activities_csv(oldest=oldest)
+
         if not activities_data:
             return {"message": "Нет активностей для синхронизации", "synced_count": 0}
-        
-        user = db.query(User).filter(User.intervals_id == settings.INTERVALS_ATHLETE_ID).first()
-        if not user:
-            user = User(
+
+        # ---- единственное место, где берём пользователя ----
+        athlete_user = (
+            db.query(User)
+            .filter(User.intervals_id == settings.INTERVALS_ATHLETE_ID)
+            .first()
+        )
+        if athlete_user is None:
+            athlete_user = User(
                 intervals_id=settings.INTERVALS_ATHLETE_ID,
                 firstname="Demo",
                 lastname="Athlete",
                 total_xp=0.0,
-                level=1
+                level=1,
             )
-            db.add(user)
+            db.add(athlete_user)
             db.commit()
-            db.refresh(user)
-        
+            db.refresh(athlete_user)
+
+        sleep_by_date: dict = {}
+        try:
+            sleep_by_date = await _sync_wellness_for_user(
+                db, athlete_user, oldest, newest
+            )
+            print(f"😴 Wellness: {len(sleep_by_date)} дней со сном")
+        except Exception as e:
+            print(f"⚠️ Wellness skip: {type(e).__name__}: {e}")
+            db.rollback()
+            athlete_user = (
+                db.query(User)
+                .filter(User.intervals_id == settings.INTERVALS_ATHLETE_ID)
+                .first()
+            )
+            sleep_by_date = {}
+
+        if athlete_user is None:
+            raise HTTPException(status_code=500, detail="User lost after rollback")
+
         new_xp = 0.0
         synced_count = 0
-        seen_ids = set()  # <-- НОВОЕ: Множество для отслеживания ID в текущем цикле
-        
-        for act in activities_data:
-            act = {k.replace('\ufeff', ''): v for k, v in act.items()}
-            
-            act_id = str(act.get('id', '')).strip()
-            if not act_id:
+        skipped_empty = 0
+        seen_ids: set[str] = set()
+
+        existing_ids = {
+            row[0]
+            for row in db.query(Activity.intervals_activity_id)
+            .filter(Activity.user_id == athlete_user.id)
+            .all()
+        }
+
+        for raw in activities_data:
+            if not isinstance(raw, dict):
                 continue
-            
-            # 1. Проверяем, не обрабатывали ли мы уже этот ID в этом же цикле (защита от дублей в CSV)
-            if act_id in seen_ids:
-                print(f"⏭️ Пропуск дубликата в CSV: {act_id}")
+
+            parsed = _parse_activity(raw)
+            if not parsed:
                 continue
-            
-            # 2. Проверяем, нет ли уже такой активности в БД
-            existing = db.query(Activity).filter(Activity.intervals_activity_id == act_id).first()
-            if existing:
+
+            act_id = parsed["intervals_activity_id"]
+            if act_id in seen_ids or act_id in existing_ids:
                 continue
-            
-            # 3. Добавляем ID в обработанные
             seen_ids.add(act_id)
-            
-            # === ИЗВЛЕЧЕНИЕ ДАННЫХ ===
-            sport_type = str(act.get('type', '') or 'WORKOUT').upper()
-            act_name = act.get('name', '') or 'Без названия'
-            
-            distance_str = act.get('distance', '') or '0'
-            try: distance_m = float(distance_str)
-            except: distance_m = 0.0
-            
-            moving_time_str = act.get('moving_time', '') or '0'
-            try: moving_time_s = int(float(moving_time_str))
-            except: moving_time_s = 0
-            
-            elevation_str = act.get('total_elevation_gain', '') or '0'
-            try: elevation_m = float(elevation_str)
-            except: elevation_m = 0.0
-            
-            training_load_str = act.get('icu_training_load', '') or '0'
-            try: training_load = float(training_load_str)
-            except: training_load = 0.0
-            
-            # Получаем intensity factor
-            intensity_str = act.get('icu_intensity', '') or '0'
+
+            if not _has_real_data(parsed):
+                skipped_empty += 1
+                continue
+
+            act_date = parsed["start_date"].strftime("%Y-%m-%d")
+            sleep_secs = sleep_by_date.get(act_date)
+            if sleep_secs is None:
+                from datetime import timedelta
+
+                prev = (parsed["start_date"] - timedelta(days=1)).strftime("%Y-%m-%d")
+                sleep_secs = sleep_by_date.get(prev)
+
             try:
-                intensity = float(intensity_str)
-                
-                # === ИСПРАВЛЕНИЕ: Если значение > 3, значит это проценты (например, 85.0)
-                # Делим на 100, чтобы получить нормальный IF (0.85)
-                if intensity > 3.0:
-                    intensity = intensity / 100.0
-                    
-            except:
-                intensity = 1.0
-            
-            # Ограничиваем множитель разумными пределами (0.5 - 2.0)
-            intensity_multiplier = round(max(0.5, min(2.0, intensity)), 2)
-            
-            if training_load > 0:
-                base_xp = training_load * 1.5
-            else:
-                base_xp = calculate_xp(sport_type, distance_m, elevation_m, moving_time_s)
-            
-            xp_earned = round(base_xp * intensity_multiplier, 2)
-            base_xp = round(base_xp, 2)
-            
-            start_date_str = act.get('start_date_local', '') or act.get('start_date', '')
-            try:
-                start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00')) if start_date_str else datetime.utcnow()
-            except Exception:
-                start_date = datetime.utcnow()
-            
-            # Создаем запись
-            new_activity = Activity(
-                user_id=user.id,
-                intervals_activity_id=act_id,
-                name=act_name,
-                sport_type=sport_type,
-                distance=distance_m,
-                moving_time=moving_time_s,
-                elevation_gain=elevation_m,
-                average_heartrate=0,
-                xp_earned=xp_earned,
-                base_xp=base_xp,
-                intensity_multiplier=intensity_multiplier,
-                start_date=start_date
+                s_mult = sleep_multiplier(sleep_secs)
+            except NameError:
+                s_mult = 1.0
+
+            xp_earned = round(
+                float(parsed["base_xp"])
+                * float(parsed["intensity_multiplier"])
+                * float(s_mult),
+                2,
             )
+
+            new_activity = Activity(
+                user_id=athlete_user.id,
+                intervals_activity_id=act_id,
+                name=parsed["name"],
+                sport_type=parsed["sport_type"],
+                distance=parsed["distance"],
+                moving_time=parsed["moving_time"],
+                elevation_gain=parsed["elevation_gain"],
+                average_heartrate=parsed.get("average_heartrate") or 0,
+                base_xp=parsed["base_xp"],
+                intensity_multiplier=parsed["intensity_multiplier"],
+                sleep_multiplier=s_mult,
+                sleep_secs=sleep_secs,
+                xp_earned=xp_earned,
+                start_date=parsed["start_date"],
+            )
+            # если нет колонок sleep_* — убери sleep_multiplier= и sleep_secs= из Activity()
+
             db.add(new_activity)
+            existing_ids.add(act_id)
             new_xp += xp_earned
             synced_count += 1
-            
-            distance_km = distance_m / 1000 if distance_m > 0 else 0
-            print(f"✅ Synced: {act_name} | {sport_type} | {distance_km:.2f}km | {moving_time_s//60}min | TL:{training_load} | IF:{intensity_multiplier:.2f} | Base:{base_xp} | +{xp_earned} XP")
-        
-        # ВАЖНО: Коммитим все изменения разом
+
+            dist_km = parsed["distance"] / 1000 if parsed["distance"] else 0
+            sleep_h = round(sleep_secs / 3600, 1) if sleep_secs else None
+            print(
+                f"✅ {parsed['name']} | {parsed['sport_type']} | "
+                f"{dist_km:.1f}km | sleep={sleep_h}h ×{s_mult} | +{xp_earned} XP"
+            )
+
         db.commit()
-        
-        # Обновляем пользователя
-        if new_xp > 0:
-            user.total_xp += new_xp
-            user.level = int((user.total_xp / 100) ** 0.5) + 1
+
+        if new_xp > 0 and athlete_user is not None:
+            athlete_user.total_xp = float(athlete_user.total_xp or 0) + new_xp
+            athlete_user.level = int((athlete_user.total_xp / 100) ** 0.5) + 1
             db.commit()
-            db.refresh(user)
-        
+            db.refresh(athlete_user)
+
         return {
             "message": "Синхронизация успешна!",
             "synced_count": synced_count,
+            "skipped_empty": skipped_empty,
             "new_xp": round(new_xp, 2),
             "user": {
-                "id": user.id,
-                "name": f"{user.firstname} {user.lastname}",
-                "level": user.level,
-                "total_xp": round(user.total_xp, 2)
-            }
+                "id": athlete_user.id,
+                "name": f"{athlete_user.firstname} {athlete_user.lastname}",
+                "level": athlete_user.level,
+                "total_xp": round(float(athlete_user.total_xp or 0), 2),
+            },
         }
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
+        import traceback
+
+        traceback.print_exc()
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Ошибка синхронизации: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка синхронизации: {type(e).__name__}: {e}",
+        )
 
 
 @router.get("/user")
@@ -163,7 +349,7 @@ async def get_user(db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Пользователь не найден. Сначала выполните POST /api/sync")
     
     # Получаем последние 10 активностей
-    activities = db.query(Activity).filter(Activity.user_id == user.id).order_by(Activity.start_date.desc()).limit(10).all()
+    activities = db.query(Activity).filter(Activity.user_id == user.id).order_by(Activity.start_date.desc()).limit(40).all()
     
     return {
         "user": {
@@ -181,6 +367,8 @@ async def get_user(db: Session = Depends(get_db)):
                 "xp": act.xp_earned,
                 "base_xp": act.base_xp if act.base_xp else 0,
                 "intensity_multiplier": act.intensity_multiplier if act.intensity_multiplier else 1.0,
+                "sleep_multiplier": act.sleep_multiplier if act.sleep_multiplier else 1.0,
+                "sleep_hours": round(act.sleep_secs / 3600, 1) if act.sleep_secs else None,
                 "date": act.start_date.strftime("%d.%m.%Y") if act.start_date else "Неизвестно"
             }
             for act in activities
@@ -215,3 +403,204 @@ async def debug_csv_sample():
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+
+def _sleep_xp(sleep_secs: int | None, sleep_score: float | None) -> float:
+    """Небольшой бонус XP за сон."""
+    if not sleep_secs or sleep_secs < 3600:
+        return 0.0
+    hours = sleep_secs / 3600.0
+    # 7–9 часов — база 15 XP, иначе меньше
+    if 7 <= hours <= 9:
+        base = 15.0
+    elif 6 <= hours < 7 or 9 < hours <= 10:
+        base = 10.0
+    else:
+        base = 5.0
+    if sleep_score and sleep_score >= 80:
+        base *= 1.3
+    elif sleep_score and sleep_score < 60:
+        base *= 0.7
+    return round(base, 2)
+
+
+@router.post("/sync-wellness")
+async def sync_wellness(
+    oldest: Optional[str] = Query(None),
+    newest: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Синхронизирует сон/wellness из Intervals.icu и начисляет sleep XP."""
+    try:
+        records = await fetch_wellness(oldest=oldest, newest=newest)
+        if not records:
+            return {"message": "Нет wellness-данных", "synced_count": 0}
+
+        user = db.query(User).filter(User.intervals_id == settings.INTERVALS_ATHLETE_ID).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Сначала выполните POST /api/sync")
+
+        new_xp = 0.0
+        synced = 0
+
+        for row in records:
+            date_str = str(row.get("id") or row.get("date") or "").strip()[:10]
+            if not date_str or len(date_str) < 10:
+                continue
+
+            existing = (
+                db.query(Wellness)
+                .filter(Wellness.user_id == user.id, Wellness.date == date_str)
+                .first()
+            )
+            if existing:
+                continue
+
+            sleep_secs = row.get("sleepSecs") or row.get("sleep_secs")
+            try:
+                sleep_secs = int(sleep_secs) if sleep_secs is not None else None
+            except (TypeError, ValueError):
+                sleep_secs = None
+
+            sleep_score = row.get("sleepScore") or row.get("sleep_score")
+            try:
+                sleep_score = float(sleep_score) if sleep_score is not None else None
+            except (TypeError, ValueError):
+                sleep_score = None
+
+            sxp = _sleep_xp(sleep_secs, sleep_score)
+
+            def _num(key_camel, key_snake=None):
+                v = row.get(key_camel)
+                if v is None and key_snake:
+                    v = row.get(key_snake)
+                try:
+                    return float(v) if v is not None else None
+                except (TypeError, ValueError):
+                    return None
+
+            def _int(key_camel, key_snake=None):
+                v = _num(key_camel, key_snake)
+                return int(v) if v is not None else None
+
+            rec = Wellness(
+                user_id=user.id,
+                date=date_str,
+                sleep_secs=sleep_secs,
+                sleep_score=sleep_score,
+                sleep_quality=_int("sleepQuality", "sleep_quality"),
+                avg_sleeping_hr=_num("avgSleepingHR", "avg_sleeping_hr"),
+                resting_hr=_int("restingHR", "resting_hr"),
+                hrv=_num("hrv"),
+                fatigue=_int("fatigue"),
+                soreness=_int("soreness"),
+                stress=_int("stress"),
+                mood=_int("mood"),
+                readiness=_num("readiness"),
+                weight=_num("weight"),
+                ctl=_num("ctl"),
+                atl=_num("atl"),
+                sleep_xp=sxp,
+            )
+            db.add(rec)
+            new_xp += sxp
+            synced += 1
+
+        db.commit()
+
+        if new_xp > 0:
+            user.total_xp += new_xp
+            user.level = int((user.total_xp / 100) ** 0.5) + 1
+            db.commit()
+            db.refresh(user)
+
+        return {
+            "message": "Wellness синхронизирован",
+            "synced_count": synced,
+            "new_xp": round(new_xp, 2),
+            "user": {
+                "level": user.level,
+                "total_xp": round(user.total_xp, 2),
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/wellness")
+async def get_wellness(
+    limit: int = Query(14, ge=1, le=90),
+    db: Session = Depends(get_db),
+):
+    """Последние записи сна/wellness."""
+    user = db.query(User).filter(User.intervals_id == settings.INTERVALS_ATHLETE_ID).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    rows = (
+        db.query(Wellness)
+        .filter(Wellness.user_id == user.id)
+        .order_by(Wellness.date.desc())
+        .limit(limit)
+        .all()
+    )
+    return {
+        "wellness": [
+            {
+                "date": r.date,
+                "sleep_hours": round(r.sleep_secs / 3600, 1) if r.sleep_secs else None,
+                "sleep_score": r.sleep_score,
+                "sleep_xp": r.sleep_xp,
+                "hrv": r.hrv,
+                "resting_hr": r.resting_hr,
+                "fatigue": r.fatigue,
+                "ctl": r.ctl,
+                "atl": r.atl,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.delete("/reset")
+async def reset_all_data(db: Session = Depends(get_db)):
+    """Полная очистка activities (+ wellness, если есть) и обнуление XP. Только для MVP."""
+    user = db.query(User).filter(User.intervals_id == settings.INTERVALS_ATHLETE_ID).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    deleted_activities = (
+        db.query(Activity)
+        .filter(Activity.user_id == user.id)
+        .delete(synchronize_session=False)
+    )
+
+    deleted_wellness = 0
+    try:
+        from ..models import Wellness
+        deleted_wellness = (
+            db.query(Wellness)
+            .filter(Wellness.user_id == user.id)
+            .delete(synchronize_session=False)
+        )
+    except Exception:
+        pass  # таблицы wellness может ещё не быть
+
+    user.total_xp = 0.0
+    user.level = 1
+    db.commit()
+
+    return {
+        "message": "Все данные очищены",
+        "deleted_activities": deleted_activities,
+        "deleted_wellness": deleted_wellness,
+        "user": {
+            "name": f"{user.firstname} {user.lastname}",
+            "level": user.level,
+            "total_xp": user.total_xp,
+        },
+    }
