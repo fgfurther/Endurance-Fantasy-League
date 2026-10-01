@@ -26,6 +26,10 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "https://endurance-fantasy-league.vercel.app",  # ← Твой домен
+        "https://vercel.com/ridemachine/endurance-fantasy-league/C1FLpfiyAeP8yGZfDtXFWXgWQsPd",  # ← Превью домен
+        # Vercel создаёт уникальные URL для каждого коммита, используем wildcard:
+        "https://*.vercel.app",  
     ],
     allow_credentials=True,
     allow_methods=["*"],
