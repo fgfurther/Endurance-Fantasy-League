@@ -58,7 +58,7 @@ export default function Profile() {
         type: "success",
         text: `✅ Sync done: ${res.data.synced_count} workouts · +${Math.round(res.data.new_xp)} XP`,
       });
-      await fetchUser();
+      await refreshUser(true);
     } catch {
       setMessage({ type: "error", text: "❌ Sync error. Check that the backend is running." });
     } finally {
