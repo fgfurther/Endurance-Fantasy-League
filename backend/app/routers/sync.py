@@ -10,7 +10,7 @@ from ..services.intervals import (
     sleep_multiplier,
 )
 from ..config import get_settings
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 router = APIRouter(prefix="/api", tags=["Sync"])
@@ -350,6 +350,57 @@ async def get_user(db: Session = Depends(get_db)):
     
     # Получаем последние 10 активностей
     activities = db.query(Activity).filter(Activity.user_id == user.id).order_by(Activity.start_date.desc()).limit(40).all()
+
+        # === РАСЧЁТ СТРИКОВ И НЕДЕЛЬНОЙ ЦЕЛИ ===
+    all_activities = db.query(Activity).filter(Activity.user_id == user.id).all()
+    today = datetime.utcnow().date()
+
+    # Стрик дней (подряд идущие дни с тренировками)
+    dates = sorted({a.start_date.date() for a in all_activities if a.start_date}, reverse=True)
+    day_streak = 0
+    if dates and (today - dates[0]).days <= 1:
+        day_streak = 1
+        for i in range(len(dates) - 1):
+            if (dates[i] - dates[i+1]).days == 1:
+                day_streak += 1
+            else:
+                break
+
+    # Стрик недель
+    def week_start(d):
+        return d - timedelta(days=d.weekday())  # понедельник текущей недели
+
+    weeks = sorted({week_start(a.start_date.date()) for a in all_activities if a.start_date}, reverse=True)
+    this_week = week_start(today)
+    week_streak = 0
+    if weeks and (this_week - weeks[0]).days <= 7:
+        week_streak = 1
+        for i in range(len(weeks) - 1):
+            if (weeks[i] - weeks[i+1]).days == 7:
+                week_streak += 1
+            else:
+                break
+
+    # Часы тренировок за текущую неделю
+    week_seconds = sum(
+        a.moving_time or 0
+        for a in all_activities
+        if a.start_date and week_start(a.start_date.date()) == this_week
+    )
+    week_hours = round(week_seconds / 3600, 1)
+
+    # === СТАТИСТИКА СЕЗОНА ===
+    SEASON_START = datetime(2026, 9, 1)  # Старт 1-го сезона Fantasy League
+
+    season_acts = [a for a in all_activities if a.start_date and a.start_date >= SEASON_START]
+    season_stats = {
+        "season_start": SEASON_START.strftime("%d.%m.%Y"),
+        "total_km": round(sum(a.distance or 0 for a in season_acts) / 1000, 1),
+        "total_hours": round(sum(a.moving_time or 0 for a in season_acts) / 3600, 1),
+        "total_elevation": int(round(sum(a.elevation_gain or 0 for a in season_acts))),
+        "total_workouts": len(season_acts),
+        "total_xp": round(sum(a.xp_earned or 0 for a in season_acts)),
+    }
     
     return {
         "user": {
@@ -358,6 +409,13 @@ async def get_user(db: Session = Depends(get_db)):
             "total_xp": round(user.total_xp, 2),
             "xp_to_next_level": round(((user.level) ** 2) * 100 - user.total_xp, 2)
         },
+        "stats": {
+            "day_streak": day_streak,
+            "week_streak": week_streak,
+            "week_hours": week_hours,
+            "week_goal_hours": 10,
+        },
+        "season_stats": season_stats,
         "recent_activities": [
             {
                 "name": act.name,

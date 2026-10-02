@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { RefreshCw, Trash2, Zap, Trophy, Cable, Watch, Bike, ArrowLeft } from "lucide-react";
+import { RefreshCw, Trash2, Zap, Trophy, Cable, Watch, Bike, ArrowLeft, BarChart3 } from "lucide-react";
 import axios from "axios";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -61,6 +61,15 @@ export default function Profile() {
     } finally {
       setResetting(false);
     }
+  };
+
+  const seasonStats = userData?.season_stats ?? {
+    season_start: "01.09.2026",
+    total_km: 0,
+    total_hours: 0,
+    total_elevation: 0,
+    total_workouts: 0,
+    total_xp: 0,
   };
 
   const sources = [
@@ -150,6 +159,37 @@ export default function Profile() {
             </div>
           </div>
         </motion.div>
+        
+        {/* Статистика сезона */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 md:p-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg md:text-xl font-semibold flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-indigo-400" />
+              Статистика сезона
+            </h3>
+            <span className="text-xs text-gray-500">Сезон №1 · с {seasonStats.season_start}</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3">
+            {[
+              { icon: "🛣️", label: "Дистанция", value: `${seasonStats.total_km} км` },
+              { icon: "⏱️", label: "Время", value: `${seasonStats.total_hours} ч` },
+              { icon: "⛰️", label: "Набор высоты", value: `${seasonStats.total_elevation} м` },
+              { icon: "🏋️", label: "Тренировок", value: `${seasonStats.total_workouts}` },
+              { icon: "⚡", label: "XP за сезон", value: `${Math.round(seasonStats.total_xp)}` },
+            ].map((s) => (
+              <div key={s.label} className="bg-white/5 rounded-lg p-3 text-center hover:bg-white/10 transition-colors">
+                <div className="text-xl mb-1">{s.icon}</div>
+                <div className="text-base md:text-lg font-bold text-white">{s.value}</div>
+                <div className="text-[11px] md:text-xs text-gray-400 mt-0.5">{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
 
         {/* Источники данных */}
         <div>

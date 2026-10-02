@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Zap, TrendingUp, Calendar, Trophy, Settings, ArrowRight } from "lucide-react";
+import { Zap, TrendingUp, Calendar, Trophy, Settings, ArrowRight, Flame, Clock } from "lucide-react";
 import axios from "axios";
 import {
   ResponsiveContainer,
@@ -14,6 +14,8 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
+import ActivityCard from "@/components/ActivityCard";
+
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -37,6 +39,8 @@ function XpTooltip({ active, payload }: any) {
 export default function Dashboard() {
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [leaderboardTab, setLeaderboardTab] = useState<"global" | "friends">("global");
+  const [inviteMessage, setInviteMessage] = useState("");
 
   const fetchUser = async () => {
     try {
@@ -83,15 +87,36 @@ export default function Dashboard() {
       sleepMult: act.sleep_multiplier ?? 1,
       intensityMult: act.intensity_multiplier ?? 1,
     }));
-
-  const xpProgress = isEmpty ? 0 : (data.user.total_xp % 100);
+    const xpProgress = isEmpty ? 0 : (data.user.total_xp % 100);
+    const stats = data.stats ?? { day_streak: 0, week_streak: 0, week_hours: 0, week_goal_hours: 10 };
 
   // Лидерборд с сортировкой
-  const leaderboard = [
+    const handleInvite = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.origin);
+      setInviteMessage("✅ Ссылка-приглашение скопирована! Отправь её друзьям");
+    } catch {
+      setInviteMessage("Скопируй ссылку из адресной строки 😉");
+    }
+    setTimeout(() => setInviteMessage(""), 3000);
+  };
+
+  // Глобальный рейтинг
+  const globalLeaderboard = [
     { name: "Alex Cyclist", level: 12, xp: 14500, isYou: false },
     { name: "Maria Runner", level: 9, xp: 8200, isYou: false },
     { name: data.user.name, level: data.user.level, xp: Math.round(data.user.total_xp), isYou: true },
     { name: "Ivan Swimmer", level: 5, xp: 2100, isYou: false },
+  ]
+    .sort((a, b) => b.xp - a.xp)
+    .map((p, i) => ({ ...p, rank: i + 1 }));
+
+  // Рейтинг среди друзей
+  const friendsLeaderboard = [
+    { name: "Серёга Скейтер", level: 4, xp: 1800, isYou: false },
+    { name: data.user.name, level: data.user.level, xp: Math.round(data.user.total_xp), isYou: true },
+    { name: "Макс Бегун", level: 3, xp: 950, isYou: false },
+    { name: "Оля Пловец", level: 2, xp: 400, isYou: false },
   ]
     .sort((a, b) => b.xp - a.xp)
     .map((p, i) => ({ ...p, rank: i + 1 }));
@@ -173,13 +198,19 @@ export default function Dashboard() {
             className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 md:p-6"
           >
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-indigo-500/20 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-indigo-400" />
+              <div className="p-3 bg-orange-500/20 rounded-lg">
+                <Flame className="w-6 h-6 text-orange-400" />
               </div>
               <div>
-                <p className="text-gray-400 text-sm">Всего XP</p>
-                <p className="text-3xl font-bold">{Math.round(data.user.total_xp)}</p>
+                <p className="text-gray-400 text-sm">Стрик</p>
+                <p className="text-3xl font-bold">
+                  {stats.day_streak} <span className="text-base font-medium text-gray-400">дней</span>
+                </p>
               </div>
+            </div>
+            <div className="mt-3 flex items-center gap-2 text-sm text-gray-400">
+              <Calendar className="w-4 h-4 text-indigo-400" />
+              {stats.week_streak} недель подряд
             </div>
           </motion.div>
 
@@ -187,38 +218,79 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
             className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 md:p-6"
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mb-3">
               <div className="p-3 bg-green-500/20 rounded-lg">
-                <Calendar className="w-6 h-6 text-green-400" />
+                <Clock className="w-6 h-6 text-green-400" />
               </div>
               <div>
-                <p className="text-gray-400 text-sm">Тренировок</p>
-                <p className="text-3xl font-bold">{data.recent_activities.length}</p>
+                <p className="text-gray-400 text-sm">Цель недели</p>
+                <p className="text-3xl font-bold">
+                  {stats.week_hours}
+                  <span className="text-base font-medium text-gray-400"> / {stats.week_goal_hours} ч</span>
+                </p>
               </div>
             </div>
+            <div className="w-full bg-gray-700 rounded-full h-2">
+              <div
+                className="bg-green-400 h-2 rounded-full transition-all"
+                style={{ width: `${Math.min(100, (stats.week_hours / stats.week_goal_hours) * 100)}%` }}
+              ></div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              {Math.min(100, Math.round((stats.week_hours / stats.week_goal_hours) * 100))}% недельной цели выполнено
+            </p>
           </motion.div>
         </div>
 
         {/* Лидерборд */}
+                {/* Лидерборд с вкладками */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
           className="bg-gradient-to-br from-indigo-900/50 to-purple-900/50 backdrop-blur-sm border border-indigo-500/30 rounded-xl p-4 md:p-6"
         >
-          <h3 className="text-lg md:text-xl font-semibold mb-4 flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-yellow-400" />
-            Глобальный рейтинг (Демо)
-          </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <h3 className="text-lg md:text-xl font-semibold flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-yellow-400" />
+              Рейтинг
+            </h3>
+
+            {/* Вкладки */}
+            <div className="flex gap-1 bg-white/5 rounded-lg p-1 self-start sm:self-auto">
+              <button
+                onClick={() => setLeaderboardTab("global")}
+                className={`px-3 md:px-4 py-1.5 rounded-md text-xs md:text-sm font-medium transition-all ${
+                  leaderboardTab === "global"
+                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                🌍 Global
+              </button>
+              <button
+                onClick={() => setLeaderboardTab("friends")}
+                className={`px-3 md:px-4 py-1.5 rounded-md text-xs md:text-sm font-medium transition-all ${
+                  leaderboardTab === "friends"
+                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                👥 Friends
+              </button>
+            </div>
+          </div>
+
+          {/* Список игроков */}
           <div className="space-y-2">
-            {leaderboard.map((player) => (
+            {(leaderboardTab === "global" ? globalLeaderboard : friendsLeaderboard).map((player) => (
               <div
-                key={player.rank}
+                key={player.name}
                 className={`flex justify-between items-center p-3 rounded-lg ${
                   player.isYou ? "bg-yellow-500/20 border border-yellow-500/50" : "bg-white/5"
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <span className={`font-bold w-6 text-center ${player.rank <= 3 ? "text-yellow-400" : "text-gray-400"}`}>
-                    #{player.rank}
+                  <span className={`font-bold w-7 text-center ${player.rank <= 3 ? "text-lg" : "text-gray-400"}`}>
+                    {player.rank <= 3 ? ["🥇", "🥈", "🥉"][player.rank - 1] : `#${player.rank}`}
                   </span>
                   <div>
                     <p className={`font-medium ${player.isYou ? "text-yellow-300" : "text-white"}`}>
@@ -231,6 +303,22 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+
+          {/* Кнопка приглашения (только во вкладке Friends) */}
+          {leaderboardTab === "friends" && (
+            <>
+              <button
+                onClick={handleInvite}
+                className="w-full mt-4 px-4 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-sm font-medium transition-all"
+              >
+                ➕ Пригласить друзей
+              </button>
+              {inviteMessage && (
+                <p className="text-xs text-green-400 mt-2 text-center">{inviteMessage}</p>
+              )}
+            </>
+          )}
+
           <p className="text-xs text-gray-500 mt-4 text-center">
             * В полной версии здесь будут реальные данные всех пользователей
           </p>
@@ -299,90 +387,9 @@ export default function Dashboard() {
             </p>
           ) : (
             <div className="space-y-3">
-              {data.recent_activities.map((act: any, idx: number) => {
-                const multiplier = act.intensity_multiplier || 1.0;
-                const multiplierColor =
-                  multiplier >= 1.2 ? "text-red-400" :
-                  multiplier >= 1.0 ? "text-yellow-400" :
-                  multiplier >= 0.7 ? "text-green-400" : "text-blue-400";
-                const multiplierLabel =
-                  multiplier >= 1.2 ? "🔥 Высокая" :
-                  multiplier >= 1.0 ? "⚡ Средняя" :
-                  multiplier >= 0.7 ? "🌿 Низкая" : "💤 Восстановление";
-
-                
-                const sleepMult = Number(act.sleep_multiplier ?? 1);
-                const sleepColor =
-                  sleepMult >= 1.4 ? "text-cyan-300" :
-                  sleepMult >= 1.0 ? "text-cyan-400" :
-                  sleepMult >= 0.7 ? "text-yellow-400" :
-                  "text-orange-400";
-
-                return (
-                  <div
-                    key={idx}
-                    className="group relative flex justify-between items-center p-3 md:p-4 bg-white/5 rounded-lg hover:bg-white/10 transition-colors border border-white/5 cursor-pointer"
-                  >
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className="text-2xl shrink-0">
-                        {act.sport === "RUN" ? "🏃" :
-                         act.sport === "RIDE" ? "🚴" :
-                         act.sport === "SWIM" ? "🏊" :
-                         act.sport === "SKATEBOARD" ? "🛹" : "🏋️"}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-white truncate">{act.name}</p>
-                        <p className="text-sm text-gray-400">
-                          {act.date} • {act.distance_km} км • {act.moving_time_min} мин
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <p className="text-yellow-400 font-bold text-lg">+{Math.round(act.xp)} XP</p>
-                      <p className="text-xs text-gray-500 uppercase tracking-wider">{act.sport}</p>
-                    </div>
-
-                    {/* Tooltip при наведении */}
-                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
-                      <div className="bg-gray-900 border border-indigo-500/50 rounded-lg p-3 shadow-xl min-w-[200px]">
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-gray-400">Базовый XP:</span>
-                            <span className="text-white font-mono">{Math.round(act.base_xp)}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-400">Интенсивность:</span>
-                            <span className={`font-mono font-bold ${multiplierColor}`}>
-                              ×{multiplier.toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-400">Нагрузка:</span>
-                            <span className={`text-xs ${multiplierColor}`}>{multiplierLabel}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-400">Сон:</span>
-                            <span className="font-mono font-bold text-cyan-400">
-                              {act.sleep_hours != null ? `${act.sleep_hours}ч ` : ""}
-                              ×{sleepMult.toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="border-t border-gray-700 pt-2 flex justify-between">
-                            <span className="text-gray-400">Итого:</span>
-                            <span className="text-yellow-400 font-bold font-mono">
-                              +{Math.round(act.xp)} XP
-                            </span>
-                          </div>
-                        </div>
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-                          <div className="w-2 h-2 bg-gray-900 border-r border-b border-indigo-500/50 transform rotate-45"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {data.recent_activities.map((act: any, idx: number) => (
+                <ActivityCard key={idx} act={act} />
+              ))}
             </div>
           )}
         </motion.div>
