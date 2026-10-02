@@ -62,19 +62,17 @@ export default function PageTransition({ children }: { children: ReactNode }) {
   }
   
   return (
-    <div className="relative w-full overflow-hidden bg-gradient-to-br from-[#171a38] via-[#2a2f6b] to-[#5866f2]">
-      <AnimatePresence mode="popLayout" initial={false}>
-        <motion.div
-          key={pathname}
-          variants={variants[dir.current]}
-          initial="initial"
-          animate="animate"
-          exit="exit"
-          className="w-full"
-        >
-          {cache.current[pathname]}
-        </motion.div>
-      </AnimatePresence>
-    </div>
+    <AnimatePresence mode="popLayout" initial={false}>
+      <motion.div
+        key={pathname}
+        variants={variants[dir.current]}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        className="w-full min-h-screen bg-gradient-to-br from-[#171a38] via-[#2a2f6b] to-[#5866f2] relative overflow-hidden"
+      >
+        {cache.current[pathname]}
+      </motion.div>
+    </AnimatePresence>
   );
 }

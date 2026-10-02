@@ -18,11 +18,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ru">
       {/* ВАЖНО: body НЕ должен иметь bg-gradient, только базовый цвет или transparent */}
-      <body className={`${inter.className} bg-[#171a38] text-white antialiased`}> 
+      <body className={`${inter.className} bg-[#171a38] text-white antialiased`}>
         <Header />
         <DreamDust />
         <DataWarmup />
-        {/* PageTransition оборачивает только children (контент страниц), а не Header */}
         <PageTransition>{children}</PageTransition>
       </body>
     </html>
