@@ -21,9 +21,9 @@ export default function ActivityCard({ act }: { act: Activity }) {
 
   const multiplier = act.intensity_multiplier || 1.0;
   const multiplierColor =
-    multiplier >= 1.2 ? "text-red-400" :
-    multiplier >= 1.0 ? "text-yellow-400" :
-    multiplier >= 0.7 ? "text-green-400" : "text-blue-400";
+    multiplier >= 1.2 ? "text-[#ff8a3d]" :
+    multiplier >= 1.0 ? "text-[#ffd02e]" :
+    multiplier >= 0.7 ? "text-[#8fd64b]" : "text-[#7c8cff]";
 
   const multiplierLabel =
     multiplier >= 1.2 ? "🔥 Высокая" :
@@ -31,108 +31,80 @@ export default function ActivityCard({ act }: { act: Activity }) {
     multiplier >= 0.7 ? "🌿 Низкая" : "💤 Восстановление";
 
   const sleepMult = Number(act.sleep_multiplier ?? 1);
-  const sleepColor =
-    sleepMult >= 1.4 ? "text-cyan-300" :
-    sleepMult >= 1.0 ? "text-cyan-400" :
-    sleepMult >= 0.7 ? "text-yellow-400" :
-    "text-orange-400";
 
-  // Обработчики для long press на мобильных
   const handleTouchStart = () => {
-    longPressTimer.current = setTimeout(() => {
-      setShowTooltip(true);
-    }, 500); // 500ms для long press
+    longPressTimer.current = setTimeout(() => setShowTooltip(true), 500);
   };
-
   const handleTouchEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-    // Скрываем tooltip через короткую задержку после отпускания
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
     setTimeout(() => setShowTooltip(false), 100);
   };
-
   const handleTouchMove = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
   };
 
   return (
     <div
-      className="group relative flex justify-between items-center p-3 md:p-4 bg-white/5 rounded-lg 
-                 hover:bg-white/10 transition-all duration-300 ease-out border border-white/5 
-                 cursor-pointer hover:scale-[1.02] hover:shadow-lg hover:shadow-indigo-500/20
-                 active:scale-[0.98] touch-manipulation"
+      className="group relative flex justify-between items-center gap-3 p-3 md:p-4 bg-white/5 rounded-2xl border-2 border-transparent hover:border-[#ffd02e]/60 hover:bg-white/10 transition-all duration-300 cursor-pointer hover:scale-[1.02] active:scale-[0.98] touch-manipulation"
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchMove}
     >
-      <div className="flex items-center gap-4 min-w-0">
-        <div className="text-2xl shrink-0">
+      <div className="flex items-center gap-3 md:gap-4 min-w-0">
+        <div className="text-2xl md:text-3xl shrink-0">
           {act.sport === "RUN" ? "🏃" :
            act.sport === "RIDE" ? "🚴" :
            act.sport === "SWIM" ? "🏊" :
            act.sport === "SKATEBOARD" ? "🛹" : "🏋️"}
         </div>
         <div className="min-w-0">
-          <p className="font-medium text-white truncate">{act.name}</p>
-          <p className="text-sm text-gray-400">
+          <p className="font-semibold text-white truncate">{act.name}</p>
+          <p className="text-sm text-[#b9bde0]">
             {act.date} • {act.distance_km} км • {act.moving_time_min} мин
           </p>
         </div>
       </div>
 
       <div className="text-right shrink-0">
-        <p className="text-yellow-400 font-bold text-lg">+{Math.round(act.xp)} XP</p>
-        <p className="text-xs text-gray-500 uppercase tracking-wider">{act.sport}</p>
+        <p className="font-display text-xl md:text-2xl text-[#ffd02e]">+{Math.round(act.xp)}</p>
+        <p className="text-[10px] text-[#b9bde0] uppercase tracking-widest">XP · {act.sport}</p>
       </div>
 
       {/* Tooltip */}
       <div
-        className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 
-                   transition-all duration-200 pointer-events-none z-10
-                   ${showTooltip ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"}`}
+        className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 transition-all duration-200 pointer-events-none z-30 ${
+          showTooltip ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+        }`}
       >
-        <div className="bg-gray-900 border border-indigo-500/50 rounded-lg p-3 shadow-xl min-w-[200px]">
+        <div className="bg-[#12122b] border-2 border-[#ffd02e] rounded-xl p-3 shadow-xl min-w-[210px]">
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-400">Базовый XP:</span>
+              <span className="text-[#b9bde0]">Базовый XP:</span>
               <span className="text-white font-mono">{Math.round(act.base_xp)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-400">Интенсивность:</span>
-              <span className={`font-mono font-bold ${multiplierColor}`}>
-                ×{multiplier.toFixed(2)}
-              </span>
+              <span className="text-[#b9bde0]">Интенсивность:</span>
+              <span className={`font-mono font-bold ${multiplierColor}`}>×{multiplier.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-400">Нагрузка:</span>
+              <span className="text-[#b9bde0]">Нагрузка:</span>
               <span className={`text-xs ${multiplierColor}`}>{multiplierLabel}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-400">Сон:</span>
-              <span className="font-mono font-bold text-cyan-400">
-                {act.sleep_hours != null ? `${act.sleep_hours}ч ` : ""}
-                ×{sleepMult.toFixed(2)}
+              <span className="text-[#b9bde0]">Сон:</span>
+              <span className="font-mono font-bold text-[#7c8cff]">
+                {act.sleep_hours != null ? `${act.sleep_hours}ч ` : ""}×{sleepMult.toFixed(2)}
               </span>
             </div>
-            <div className="border-t border-gray-700 pt-2 flex justify-between">
-              <span className="text-gray-400">Итого:</span>
-              <span className="text-yellow-400 font-bold font-mono">
-                +{Math.round(act.xp)} XP
-              </span>
+            <div className="border-t border-white/10 pt-2 flex justify-between">
+              <span className="text-[#b9bde0]">Итого:</span>
+              <span className="font-display text-[#ffd02e]">+{Math.round(act.xp)} XP</span>
             </div>
           </div>
         </div>
-        {/* Стрелочка */}
-        <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-          <div className="w-2 h-2 bg-gray-900 border-r border-b border-indigo-500/50 transform rotate-45"></div>
-        </div>
+        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-[#12122b] border-r-2 border-b-2 border-[#ffd02e] rotate-45"></div>
       </div>
     </div>
   );

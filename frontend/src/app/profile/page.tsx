@@ -3,10 +3,26 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { RefreshCw, Trash2, Zap, Trophy, Cable, Watch, Bike, ArrowLeft, BarChart3 } from "lucide-react";
 import axios from "axios";
+import type { ReactNode } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+function Star({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+      <path d="M12 0c1 8 4 11 12 12-8 1-11 4-12 12-1-8-4-11-12-12 8-1 11-4 12-12z" />
+    </svg>
+  );
+}
+
+function Sticker({ className = "", children }: { className?: string; children: ReactNode }) {
+  return (
+    <span className={`font-sticker inline-block px-3 py-0.5 rounded-lg border-2 border-[#12122b] shadow-[3px_4px_0_rgba(10,10,40,0.4)] text-lg font-bold ${className}`}>
+      {children}
+    </span>
+  );
+}
 
 export default function Profile() {
   const [userData, setUserData] = useState<any>(null);
@@ -76,8 +92,8 @@ export default function Profile() {
     {
       name: "Intervals.icu",
       desc: "Агрегатор Strava, Garmin, Wahoo и других",
-      icon: Cable,
-      color: "from-indigo-500 to-purple-500",
+      emoji: "🔌",
+      bg: "bg-[#4d5cf0]",
       status: "connected",
       label: "Синхронизировать Intervals",
       onClick: handleSyncIntervals,
@@ -86,8 +102,8 @@ export default function Profile() {
     {
       name: "Garmin",
       desc: "Прямое подключение Garmin Connect",
-      icon: Watch,
-      color: "from-blue-500 to-cyan-500",
+      emoji: "",
+      bg: "bg-[#38bdf8]",
       status: "soon",
       label: "Синхронизировать Garmin",
       onClick: () => handleStub("Garmin"),
@@ -96,8 +112,8 @@ export default function Profile() {
     {
       name: "Strava",
       desc: "Прямое подключение Strava",
-      icon: Bike,
-      color: "from-orange-500 to-red-500",
+      emoji: "🚴",
+      bg: "bg-[#ff8a3d]",
       status: "soon",
       label: "Синхронизировать Strava",
       onClick: () => handleStub("Strava"),
@@ -106,28 +122,35 @@ export default function Profile() {
   ];
 
   return (
-    <main className="min-h-screen gradient-bg text-white p-3 sm:p-4 md:p-8">
+    <main className="min-h-screen bg-[#5866f2] text-white p-3 sm:p-6 md:p-10 relative overflow-hidden">
+      <Star className="absolute w-6 h-6 text-white top-[4%] left-[5%] animate-pulse" />
+      <Star className="absolute w-4 h-4 text-white top-[10%] right-[7%] animate-pulse" />
+      <Star className="absolute w-5 h-5 text-white bottom-[7%] left-[8%] animate-pulse" />
+      <Star className="absolute w-6 h-6 text-white bottom-[5%] right-[5%] animate-pulse" />
+
       <div className="max-w-3xl mx-auto space-y-5 md:space-y-8">
 
         {/* Заголовок */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-            Профиль
-          </h1>
-          <Link href="/dashboard" className="text-sm text-gray-400 hover:text-white flex items-center gap-1">
-            <ArrowLeft className="w-4 h-4" /> К дашборду
+        <div className="flex items-end justify-between gap-3">
+          <div className="space-y-3">
+            <Sticker className="bg-[#8fd64b] text-[#12122b] -rotate-2">кабинет атлета</Sticker>
+            <h1 className="font-display uppercase text-4xl md:text-6xl leading-none">
+              Про<span className="text-[#ffd02e]">филь</span>
+            </h1>
+          </div>
+          <Link href="/dashboard" className="px-5 py-2.5 rounded-full bg-[#e9e7f2] text-[#171a38] text-sm font-semibold hover:bg-white transition-colors">
+            ← К дашборду
           </Link>
         </div>
 
         {/* Сообщения */}
         {message && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`p-3 md:p-4 rounded-lg border text-sm md:text-base ${
-              message.type === "success" ? "bg-green-500/10 border-green-500/50 text-green-300" :
-              message.type === "error" ? "bg-red-500/10 border-red-500/50 text-red-300" :
-              "bg-indigo-500/10 border-indigo-500/50 text-indigo-300"
+            initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+            className={`p-3 md:p-4 rounded-2xl border-2 text-sm md:text-base font-medium ${
+              message.type === "success" ? "bg-[#8fd64b]/20 border-[#8fd64b] text-[#8fd64b]" :
+              message.type === "error" ? "bg-[#ff8a3d]/20 border-[#ff8a3d] text-[#ff8a3d]" :
+              "bg-[#7c8cff]/20 border-[#7c8cff] text-[#aab6ff]"
             }`}
           >
             {message.text}
@@ -135,101 +158,94 @@ export default function Profile() {
         )}
 
         {/* Карточка профиля */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 md:p-6"
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          className="bg-[#171a38] rounded-[2rem] p-4 md:p-6"
         >
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-2xl md:text-3xl font-bold shrink-0">
-              {userData ? userData.user.name.charAt(0) : "🏃"}
+            <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-[#ffd02e] flex items-center justify-center font-display text-3xl md:text-4xl text-[#171a38] shrink-0">
+              {userData ? userData.user.name.charAt(0) : "😴"}
             </div>
             <div className="min-w-0">
-              <h2 className="text-lg md:text-2xl font-bold truncate">
+              <h2 className="font-display uppercase text-2xl md:text-3xl truncate">
                 {userData ? userData.user.name : "Атлет"}
               </h2>
-              <div className="flex flex-wrap items-center gap-2 mt-1">
-                <span className="px-2 py-0.5 bg-yellow-500/20 border border-yellow-500/50 rounded-full text-yellow-300 text-xs font-medium">
-                  Уровень {userData ? userData.user.level : 1}
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <span className="px-3 py-1 bg-[#ffd02e]/20 border-2 border-[#ffd02e] rounded-full text-[#ffd02e] text-xs font-bold">
+                  ⭐ Уровень {userData ? userData.user.level : 1}
                 </span>
-                <span className="px-2 py-0.5 bg-indigo-500/20 border border-indigo-500/50 rounded-full text-indigo-300 text-xs font-medium flex items-center gap-1">
-                  <Zap className="w-3 h-3" />
-                  {Math.round(userData ? userData.user.total_xp : 0)} XP
+                <span className="px-3 py-1 bg-[#f6b8d0]/20 border-2 border-[#f6b8d0] rounded-full text-[#f6b8d0] text-xs font-bold">
+                  ⚡ {Math.round(userData ? userData.user.total_xp : 0)} XP
                 </span>
               </div>
             </div>
           </div>
         </motion.div>
-        
+
         {/* Статистика сезона */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 md:p-6"
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+          className="bg-[#171a38] rounded-3xl p-4 md:p-6"
         >
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg md:text-xl font-semibold flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-indigo-400" />
-              Статистика сезона
-            </h3>
-            <span className="text-xs text-gray-500">Сезон №1 · с {seasonStats.season_start}</span>
+            <h3 className="font-display uppercase text-xl md:text-2xl">📊 Статистика сезона</h3>
+            <span className="font-sticker text-[#f6b8d0] text-lg">с {seasonStats.season_start}</span>
           </div>
-
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3">
             {[
               { icon: "🛣️", label: "Дистанция", value: `${seasonStats.total_km} км` },
               { icon: "⏱️", label: "Время", value: `${seasonStats.total_hours} ч` },
-              { icon: "⛰️", label: "Набор высоты", value: `${seasonStats.total_elevation} м` },
+              { icon: "⛰️", label: "Набор", value: `${seasonStats.total_elevation} м` },
               { icon: "🏋️", label: "Тренировок", value: `${seasonStats.total_workouts}` },
-              { icon: "⚡", label: "XP за сезон", value: `${Math.round(seasonStats.total_xp)}` },
+              { icon: "⚡", label: "XP", value: `${Math.round(seasonStats.total_xp)}` },
             ].map((s) => (
-              <div key={s.label} className="bg-white/5 rounded-lg p-3 text-center hover:bg-white/10 transition-colors">
+              <div key={s.label} className="bg-white/5 rounded-2xl p-3 text-center hover:bg-white/10 transition-colors">
                 <div className="text-xl mb-1">{s.icon}</div>
-                <div className="text-base md:text-lg font-bold text-white">{s.value}</div>
-                <div className="text-[11px] md:text-xs text-gray-400 mt-0.5">{s.label}</div>
+                <div className="font-display text-lg md:text-xl text-white">{s.value}</div>
+                <div className="text-[11px] text-[#b9bde0] mt-0.5">{s.label}</div>
               </div>
             ))}
           </div>
         </motion.div>
 
-
         {/* Источники данных */}
         <div>
-          <h3 className="text-lg md:text-xl font-semibold mb-3 md:mb-4">Источники данных</h3>
+          <div className="flex items-center gap-3 mb-3">
+            <h3 className="font-display uppercase text-xl md:text-2xl">Источники данных</h3>
+            <Sticker className="bg-[#ffd02e] text-[#12122b] rotate-2 text-base">подключи сон</Sticker>
+          </div>
           <div className="space-y-3">
             {sources.map((source, idx) => (
               <motion.div
                 key={source.name}
-                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.1 }}
-                className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 md:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
+                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 + idx * 0.1 }}
+                className="bg-[#171a38] rounded-3xl p-4 md:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
               >
-                <div className={`w-11 h-11 rounded-lg bg-gradient-to-br ${source.color} flex items-center justify-center shrink-0`}>
-                  <source.icon className="w-5 h-5 text-white" />
+                <div className={`w-12 h-12 rounded-2xl ${source.bg} flex items-center justify-center text-2xl shrink-0`}>
+                  {source.emoji}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold">{source.name}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-display uppercase text-lg">{source.name}</p>
                     {source.status === "connected" ? (
-                      <span className="px-2 py-0.5 bg-green-500/20 border border-green-500/50 rounded-full text-green-300 text-[10px] font-medium uppercase">
+                      <span className="px-2 py-0.5 bg-[#8fd64b]/20 border border-[#8fd64b] rounded-full text-[#8fd64b] text-[10px] font-bold uppercase">
                         Подключено
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 bg-gray-500/20 border border-gray-500/50 rounded-full text-gray-400 text-[10px] font-medium uppercase">
+                      <span className="px-2 py-0.5 bg-white/10 border border-white/20 rounded-full text-[#b9bde0] text-[10px] font-bold uppercase">
                         Скоро
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-gray-400 truncate">{source.desc}</p>
+                  <p className="text-sm text-[#b9bde0] truncate">{source.desc}</p>
                 </div>
                 <button
                   onClick={source.onClick}
                   disabled={source.loading}
-                  className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 shrink-0 ${
+                  className={`px-4 py-2.5 rounded-full font-semibold text-sm transition-all shrink-0 ${
                     source.status === "connected"
-                      ? "bg-indigo-600 hover:bg-indigo-500 text-white"
-                      : "bg-white/10 hover:bg-white/20 text-gray-300"
+                      ? "bg-[#ffd02e] text-[#171a38] hover:scale-105"
+                      : "bg-white/10 text-[#b9bde0] hover:bg-white/20"
                   } disabled:opacity-50`}
                 >
-                  <RefreshCw className={`w-4 h-4 ${source.loading ? "animate-spin" : ""}`} />
                   {source.loading ? "Синхронизация..." : source.label}
                 </button>
               </motion.div>
@@ -238,25 +254,25 @@ export default function Profile() {
         </div>
 
         {/* Опасная зона */}
-        <div className="bg-red-500/5 border border-red-500/30 rounded-xl p-4 md:p-6">
-          <h3 className="text-lg font-semibold text-red-400 mb-2">Опасная зона</h3>
-          <p className="text-sm text-gray-400 mb-4">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+          className="bg-[#171a38] border-2 border-[#ff8a3d] rounded-3xl p-4 md:p-6"
+        >
+          <h3 className="font-display uppercase text-xl text-[#ff8a3d] mb-2"> Опасная зона</h3>
+          <p className="text-sm text-[#b9bde0] mb-4">
             Полностью удаляет все синхронизированные тренировки и сбрасывает прогресс до 1 уровня.
           </p>
           <button
             onClick={handleReset}
             disabled={resetting || !userData}
-            className="px-4 py-2.5 bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-500/50 rounded-lg text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-5 py-2.5 bg-[#ff8a3d]/20 hover:bg-[#ff8a3d]/40 text-[#ff8a3d] border-2 border-[#ff8a3d] rounded-full text-sm font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Trash2 className="w-4 h-4" />
-            {resetting ? "Очистка..." : "Очистить все данные"}
+            {resetting ? "Очистка..." : "🗑 Очистить все данные"}
           </button>
-        </div>
+        </motion.div>
 
-        <div className="flex items-center gap-2 text-xs text-gray-500 justify-center pb-4">
-          <Trophy className="w-4 h-4" />
-          Fantasy League · Профиль атлета
-        </div>
+        <p className="font-sticker text-center text-white/70 text-xl pb-4">
+          сладких снов и быстрых ног ✨
+        </p>
       </div>
     </main>
   );

@@ -3,35 +3,40 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Zap, TrendingUp, Calendar, Trophy, Settings, ArrowRight, Flame, Clock } from "lucide-react";
 import axios from "axios";
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-} from "recharts";
+import type { ReactNode } from "react";
 import ActivityCard from "@/components/ActivityCard";
-
+import {
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
+} from "recharts";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+function Star({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+      <path d="M12 0c1 8 4 11 12 12-8 1-11 4-12 12-1-8-4-11-12-12 8-1 11-4 12-12z" />
+    </svg>
+  );
+}
+
+function Sticker({ className = "", children }: { className?: string; children: ReactNode }) {
+  return (
+    <span className={`font-sticker inline-block px-3 py-0.5 rounded-lg border-2 border-[#12122b] shadow-[3px_4px_0_rgba(10,10,40,0.4)] text-lg font-bold ${className}`}>
+      {children}
+    </span>
+  );
+}
 
 function XpTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="bg-gray-900 border border-indigo-500/50 rounded-lg p-3 shadow-xl text-sm min-w-[180px]">
-      <p className="text-white font-medium mb-1">{d.name}</p>
-      <p className="text-gray-400 text-xs mb-2">
-        {d.date} · {d.sport} · {d.distance} км
-      </p>
-      <p className="text-yellow-400 font-bold text-lg">+{d.xp} XP</p>
-      <p className="text-xs text-gray-500 mt-1">
-        IF ×{Number(d.intensityMult).toFixed(2)} · сон ×{Number(d.sleepMult).toFixed(2)}
-      </p>
+    <div className="bg-[#12122b] border-2 border-[#ffd02e] rounded-xl p-3 shadow-xl text-sm min-w-[180px]">
+      <p className="font-sticker text-white text-lg mb-1">{d.name}</p>
+      <p className="text-[#b9bde0] text-xs mb-2">{d.date} · {d.sport} · {d.distance} км</p>
+      <p className="font-display text-xl text-[#ffd02e]">+{d.xp} XP</p>
+      <p className="text-xs text-[#b9bde0] mt-1">IF ×{Number(d.intensityMult).toFixed(2)} · сон ×{Number(d.sleepMult).toFixed(2)}</p>
     </div>
   );
 }
@@ -46,8 +51,7 @@ export default function Dashboard() {
     try {
       const res = await axios.get(`${API_URL}/api/user`);
       setUserData(res.data);
-    } catch (error) {
-      console.error("Ошибка загрузки:", error);
+    } catch {
       setUserData(null);
     } finally {
       setLoading(false);
@@ -60,21 +64,19 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen gradient-bg flex items-center justify-center">
-        <div className="text-indigo-400 text-xl animate-pulse">Загрузка данных атлета...</div>
+      <div className="min-h-screen bg-[#5866f2] flex items-center justify-center">
+        <div className="font-display text-white text-2xl animate-pulse">ВИДИМ СНЫ...</div>
       </div>
     );
   }
 
   const isEmpty = !userData || !userData.user;
-
-  // Данные по умолчанию для пустого состояния
   const data = userData ?? {
     user: { name: "Атлет", level: 1, total_xp: 0, xp_to_next_level: 100 },
     recent_activities: [],
   };
+  const stats = data.stats ?? { day_streak: 0, week_streak: 0, week_hours: 0, week_goal_hours: 10 };
 
-  // График: от старых к новым
   const chartData = [...(data.recent_activities || [])]
     .slice()
     .reverse()
@@ -87,303 +89,172 @@ export default function Dashboard() {
       sleepMult: act.sleep_multiplier ?? 1,
       intensityMult: act.intensity_multiplier ?? 1,
     }));
-    const xpProgress = isEmpty ? 0 : (data.user.total_xp % 100);
-    const stats = data.stats ?? { day_streak: 0, week_streak: 0, week_hours: 0, week_goal_hours: 10 };
 
-  // Лидерборд с сортировкой
-    const handleInvite = async () => {
+  const xpProgress = isEmpty ? 0 : (data.user.total_xp % 100);
+
+  const handleInvite = async () => {
     try {
       await navigator.clipboard.writeText(window.location.origin);
-      setInviteMessage("✅ Ссылка-приглашение скопирована! Отправь её друзьям");
+      setInviteMessage("✅ Ссылка скопирована! Отправь её друзьям");
     } catch {
       setInviteMessage("Скопируй ссылку из адресной строки 😉");
     }
     setTimeout(() => setInviteMessage(""), 3000);
   };
 
-  // Глобальный рейтинг
   const globalLeaderboard = [
     { name: "Alex Cyclist", level: 12, xp: 14500, isYou: false },
     { name: "Maria Runner", level: 9, xp: 8200, isYou: false },
     { name: data.user.name, level: data.user.level, xp: Math.round(data.user.total_xp), isYou: true },
     { name: "Ivan Swimmer", level: 5, xp: 2100, isYou: false },
-  ]
-    .sort((a, b) => b.xp - a.xp)
-    .map((p, i) => ({ ...p, rank: i + 1 }));
+  ].sort((a, b) => b.xp - a.xp).map((p, i) => ({ ...p, rank: i + 1 }));
 
-  // Рейтинг среди друзей
   const friendsLeaderboard = [
     { name: "Серёга Скейтер", level: 4, xp: 1800, isYou: false },
     { name: data.user.name, level: data.user.level, xp: Math.round(data.user.total_xp), isYou: true },
     { name: "Макс Бегун", level: 3, xp: 950, isYou: false },
     { name: "Оля Пловец", level: 2, xp: 400, isYou: false },
-  ]
-    .sort((a, b) => b.xp - a.xp)
-    .map((p, i) => ({ ...p, rank: i + 1 }));
+  ].sort((a, b) => b.xp - a.xp).map((p, i) => ({ ...p, rank: i + 1 }));
 
   return (
-    <main className="min-h-screen gradient-bg text-white p-3 sm:p-4 md:p-8">
-      <div className="max-w-4xl mx-auto space-y-5 md:space-y-8">
+    <main className="min-h-screen bg-[#5866f2] text-white p-3 sm:p-6 md:p-10 relative overflow-hidden">
+      {/* Звёзды на фоне */}
+      <Star className="absolute w-6 h-6 text-white top-[3%] left-[4%] animate-pulse" />
+      <Star className="absolute w-4 h-4 text-white top-[8%] right-[6%] animate-pulse" />
+      <Star className="absolute w-5 h-5 text-white bottom-[6%] left-[7%] animate-pulse" />
+      <Star className="absolute w-6 h-6 text-white bottom-[4%] right-[4%] animate-pulse" />
 
-        {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center">
-          <div>
-            <h1 className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-              Привет, {data.user.name}!
+      <div className="max-w-5xl mx-auto space-y-5 md:space-y-8">
+
+        {/* Приветствие */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="space-y-3">
+            <Sticker className="bg-[#f6b8d0] text-[#12122b] -rotate-2">твой сон = твой xp</Sticker>
+            <h1 className="font-display uppercase text-4xl md:text-6xl leading-none">
+              Привет, <span className="text-[#ffd02e]">{data.user.name}!</span>
             </h1>
-            <p className="text-gray-400 mt-1 text-sm md:text-base">
-              {isEmpty ? "Твой прогресс пока пустой" : "Твой прогресс в Fantasy League"}
-            </p>
+            <p className="text-[#dcdaf5]/80 text-sm md:text-base">Твой прогресс в Dream League</p>
           </div>
           <Link
             href="/profile"
-            className="px-4 py-2.5 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2"
+            className="px-5 py-2.5 rounded-full bg-[#e9e7f2] text-[#171a38] text-sm font-semibold hover:bg-white transition-colors self-start md:self-auto"
           >
-            <Settings className="w-4 h-4" />
-            Управление данными
+            ⚙️ Управление данными
           </Link>
         </div>
 
         {/* Пустое состояние */}
         {isEmpty && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-br from-indigo-900/30 to-purple-900/30 border border-indigo-500/40 rounded-xl p-5 md:p-8 text-center space-y-4"
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-[#171a38] rounded-[2rem] p-6 md:p-10 text-center space-y-4"
           >
-            <div className="text-5xl">🏁</div>
-            <h2 className="text-xl md:text-2xl font-bold">У тебя пока нет тренировок</h2>
-            <p className="text-sm md:text-base text-gray-400 max-w-md mx-auto">
-              Ты — <span className="text-yellow-300 font-semibold">Уровень 1</span> с <span className="text-indigo-300 font-semibold">0 XP</span>.
-              Подключи источник данных в профиле, синхронизируй первую тренировку и получи свой первый опыт!
+            <div className="text-6xl md:text-7xl">😴</div>
+            <h2 className="font-display uppercase text-2xl md:text-4xl">Ты пока спишь…</h2>
+            <p className="text-[#b9bde0] text-sm md:text-base max-w-md mx-auto">
+              Уровень 1 · 0 XP · 0 тренировок. Синхронизируй первую тренировку — и сон станет явью!
             </p>
             <Link
               href="/profile"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl font-semibold transition-all transform hover:scale-105"
+              className="inline-block px-6 py-3 rounded-full bg-[#ffd02e] text-[#171a38] font-bold hover:scale-105 transition-transform"
             >
               ⚡ Синхронизировать тренировку
-              <ArrowRight className="w-4 h-4" />
             </Link>
           </motion.div>
         )}
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 md:p-6"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-3 bg-yellow-500/20 rounded-lg">
-                <Zap className="w-6 h-6 text-yellow-400" />
-              </div>
-              <div>
-                <p className="text-gray-400 text-sm">Уровень</p>
-                <p className="text-3xl font-bold">{data.user.level}</p>
-              </div>
+        {/* Статистика */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-5">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-[#171a38] rounded-3xl p-4 md:p-6">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[#b9bde0] text-sm">Уровень</p>
+              <span className="text-2xl">⭐</span>
             </div>
-            <div className="w-full bg-gray-700 rounded-full h-2">
-              <div
-                className="bg-yellow-400 h-2 rounded-full transition-all"
-                style={{ width: `${xpProgress}%` }}
-              ></div>
+            <p className="font-display text-5xl md:text-6xl text-[#ffd02e]">{data.user.level}</p>
+            <div className="w-full bg-white/10 rounded-full h-2.5 mt-4">
+              <div className="bg-[#ffd02e] h-2.5 rounded-full transition-all" style={{ width: `${xpProgress}%` }}></div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
+            <p className="text-xs text-[#b9bde0] mt-2">
               {isEmpty ? "100 XP до следующего уровня" : `${Math.round(data.user.xp_to_next_level)} XP до следующего уровня`}
             </p>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-            className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 md:p-6"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-orange-500/20 rounded-lg">
-                <Flame className="w-6 h-6 text-orange-400" />
-              </div>
-              <div>
-                <p className="text-gray-400 text-sm">Стрик</p>
-                <p className="text-3xl font-bold">
-                  {stats.day_streak} <span className="text-base font-medium text-gray-400">дней</span>
-                </p>
-              </div>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+            className="bg-[#171a38] rounded-3xl p-4 md:p-6">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[#b9bde0] text-sm">Стрик</p>
+              <span className="text-2xl">🔥</span>
             </div>
-            <div className="mt-3 flex items-center gap-2 text-sm text-gray-400">
-              <Calendar className="w-4 h-4 text-indigo-400" />
-              {stats.week_streak} недель подряд
-            </div>
+            <p className="font-display text-5xl md:text-6xl text-[#ff8a3d]">
+              {stats.day_streak} <span className="text-lg text-[#b9bde0]">дней</span>
+            </p>
+            <p className="text-sm text-[#b9bde0] mt-3">📅 {stats.week_streak} недель подряд</p>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-            className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 md:p-6"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-3 bg-green-500/20 rounded-lg">
-                <Clock className="w-6 h-6 text-green-400" />
-              </div>
-              <div>
-                <p className="text-gray-400 text-sm">Цель недели</p>
-                <p className="text-3xl font-bold">
-                  {stats.week_hours}
-                  <span className="text-base font-medium text-gray-400"> / {stats.week_goal_hours} ч</span>
-                </p>
-              </div>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+            className="bg-[#171a38] rounded-3xl p-4 md:p-6">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[#b9bde0] text-sm">Цель недели</p>
+              <span className="text-2xl">⏱️</span>
             </div>
-            <div className="w-full bg-gray-700 rounded-full h-2">
+            <p className="font-display text-5xl md:text-6xl text-[#8fd64b]">
+              {stats.week_hours}<span className="text-lg text-[#b9bde0]"> / {stats.week_goal_hours} ч</span>
+            </p>
+            <div className="w-full bg-white/10 rounded-full h-2.5 mt-4">
               <div
-                className="bg-green-400 h-2 rounded-full transition-all"
+                className="bg-[#8fd64b] h-2.5 rounded-full transition-all"
                 style={{ width: `${Math.min(100, (stats.week_hours / stats.week_goal_hours) * 100)}%` }}
               ></div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
-              {Math.min(100, Math.round((stats.week_hours / stats.week_goal_hours) * 100))}% недельной цели выполнено
+            <p className="text-xs text-[#b9bde0] mt-2">
+              {Math.min(100, Math.round((stats.week_hours / stats.week_goal_hours) * 100))}% недельной цели
             </p>
           </motion.div>
         </div>
 
-        {/* Лидерборд */}
-                {/* Лидерборд с вкладками */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
-          className="bg-gradient-to-br from-indigo-900/50 to-purple-900/50 backdrop-blur-sm border border-indigo-500/30 rounded-xl p-4 md:p-6"
-        >
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-            <h3 className="text-lg md:text-xl font-semibold flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-yellow-400" />
-              Рейтинг
-            </h3>
-
-            {/* Вкладки */}
-            <div className="flex gap-1 bg-white/5 rounded-lg p-1 self-start sm:self-auto">
-              <button
-                onClick={() => setLeaderboardTab("global")}
-                className={`px-3 md:px-4 py-1.5 rounded-md text-xs md:text-sm font-medium transition-all ${
-                  leaderboardTab === "global"
-                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
-                🌍 Global
-              </button>
-              <button
-                onClick={() => setLeaderboardTab("friends")}
-                className={`px-3 md:px-4 py-1.5 rounded-md text-xs md:text-sm font-medium transition-all ${
-                  leaderboardTab === "friends"
-                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
-                👥 Friends
-              </button>
-            </div>
-          </div>
-
-          {/* Список игроков */}
-          <div className="space-y-2">
-            {(leaderboardTab === "global" ? globalLeaderboard : friendsLeaderboard).map((player) => (
-              <div
-                key={player.name}
-                className={`flex justify-between items-center p-3 rounded-lg ${
-                  player.isYou ? "bg-yellow-500/20 border border-yellow-500/50" : "bg-white/5"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className={`font-bold w-7 text-center ${player.rank <= 3 ? "text-lg" : "text-gray-400"}`}>
-                    {player.rank <= 3 ? ["🥇", "🥈", "🥉"][player.rank - 1] : `#${player.rank}`}
-                  </span>
-                  <div>
-                    <p className={`font-medium ${player.isYou ? "text-yellow-300" : "text-white"}`}>
-                      {player.name} {player.isYou && "(Вы)"}
-                    </p>
-                    <p className="text-xs text-gray-400">Level {player.level}</p>
-                  </div>
-                </div>
-                <span className="font-mono text-indigo-300">{player.xp.toLocaleString()} XP</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Кнопка приглашения (только во вкладке Friends) */}
-          {leaderboardTab === "friends" && (
-            <>
-              <button
-                onClick={handleInvite}
-                className="w-full mt-4 px-4 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-sm font-medium transition-all"
-              >
-                ➕ Пригласить друзей
-              </button>
-              {inviteMessage && (
-                <p className="text-xs text-green-400 mt-2 text-center">{inviteMessage}</p>
-              )}
-            </>
-          )}
-
-          <p className="text-xs text-gray-500 mt-4 text-center">
-            * В полной версии здесь будут реальные данные всех пользователей
-          </p>
-        </motion.div>
-
-        {/* График прогресса XP */}
+        {/* График */}
         {chartData.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
-            className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 md:p-6"
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+            className="bg-[#171a38] rounded-3xl p-4 md:p-6"
           >
-            <h3 className="text-lg md:text-xl font-semibold mb-4 flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-indigo-400" />
-              Динамика получения XP
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display uppercase text-xl md:text-2xl">Динамика XP</h3>
+              <Sticker className="bg-[#8fd64b] text-[#12122b] rotate-2 text-base">растёт!</Sticker>
+            </div>
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="xpFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#818cf8" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="#818cf8" stopOpacity={0} />
+                      <stop offset="0%" stopColor="#ffd02e" stopOpacity={0.5} />
+                      <stop offset="100%" stopColor="#ffd02e" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#ffffff15" />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fill: "#9ca3af", fontSize: 12 }}
-                    axisLine={{ stroke: "#ffffff20" }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: "#9ca3af", fontSize: 12 }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={40}
-                  />
-                  <Tooltip content={<XpTooltip />} cursor={{ stroke: "#818cf8", strokeWidth: 1 }} />
-                  <Area
-                    type="monotone"
-                    dataKey="xp"
-                    stroke="#818cf8"
-                    strokeWidth={2}
-                    fill="url(#xpFill)"
-                    activeDot={{ r: 6, fill: "#a5b4fc", stroke: "#312e81", strokeWidth: 2 }}
-                  />
+                  <XAxis dataKey="date" tick={{ fill: "#b9bde0", fontSize: 12 }} axisLine={{ stroke: "#ffffff20" }} tickLine={false} />
+                  <YAxis tick={{ fill: "#b9bde0", fontSize: 12 }} axisLine={false} tickLine={false} width={40} />
+                  <Tooltip content={<XpTooltip />} cursor={{ stroke: "#ffd02e", strokeWidth: 1 }} />
+                  <Area type="monotone" dataKey="xp" stroke="#ffd02e" strokeWidth={2.5} fill="url(#xpFill)"
+                    activeDot={{ r: 6, fill: "#ffd02e", stroke: "#171a38", strokeWidth: 2 }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </motion.div>
         )}
 
-        {/* Последние тренировки */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
-          className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 md:p-6"
+        {/* Тренировки */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+          className="bg-[#171a38] rounded-3xl p-4 md:p-6"
         >
-          <h3 className="text-lg md:text-xl font-semibold mb-4">Последние тренировки</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-display uppercase text-xl md:text-2xl">Последние тренировки</h3>
+            <Sticker className="bg-[#f6b8d0] text-[#12122b] rotate-2 text-base">снилось же…</Sticker>
+          </div>
           {data.recent_activities.length === 0 ? (
-            <p className="text-gray-400 text-sm">
+            <p className="text-[#b9bde0] text-sm">
               Пока пусто. Синхронизируй тренировки в{" "}
-              <Link href="/profile" className="text-indigo-400 hover:text-indigo-300 underline">
-                профиле
-              </Link>
-              — и они появятся здесь.
+              <Link href="/profile" className="text-[#ffd02e] underline">профиле</Link> — и они появятся здесь.
             </p>
           ) : (
             <div className="space-y-3">
@@ -394,7 +265,72 @@ export default function Dashboard() {
           )}
         </motion.div>
 
-        
+        {/* Рейтинг */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+          className="bg-[#171a38] rounded-3xl p-4 md:p-6"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <h3 className="font-display uppercase text-xl md:text-2xl">🏆 Рейтинг</h3>
+            <div className="flex gap-1.5 bg-white/5 rounded-full p-1 self-start">
+              <button
+                onClick={() => setLeaderboardTab("global")}
+                className={`px-4 py-1.5 rounded-full text-xs md:text-sm font-semibold transition-colors ${
+                  leaderboardTab === "global" ? "bg-[#ffd02e] text-[#171a38]" : "text-[#b9bde0] hover:text-white"
+                }`}
+              >
+                🌍 Global
+              </button>
+              <button
+                onClick={() => setLeaderboardTab("friends")}
+                className={`px-4 py-1.5 rounded-full text-xs md:text-sm font-semibold transition-colors ${
+                  leaderboardTab === "friends" ? "bg-[#ffd02e] text-[#171a38]" : "text-[#b9bde0] hover:text-white"
+                }`}
+              >
+                👥 Friends
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {(leaderboardTab === "global" ? globalLeaderboard : friendsLeaderboard).map((player) => (
+              <div
+                key={player.name}
+                className={`flex justify-between items-center p-3 rounded-2xl ${
+                  player.isYou ? "bg-[#ffd02e]/20 border-2 border-[#ffd02e]" : "bg-white/5"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className={`font-display w-8 text-center text-lg ${player.rank <= 3 ? "text-[#ffd02e]" : "text-[#b9bde0]"}`}>
+                    {player.rank <= 3 ? ["🥇", "", ""][player.rank - 1] : `#${player.rank}`}
+                  </span>
+                  <div>
+                    <p className={`font-semibold ${player.isYou ? "text-[#ffd02e]" : "text-white"}`}>
+                      {player.name} {player.isYou && "(Вы)"}
+                    </p>
+                    <p className="text-xs text-[#b9bde0]">Level {player.level}</p>
+                  </div>
+                </div>
+                <span className="font-display text-[#7c8cff]">{player.xp.toLocaleString()} XP</span>
+              </div>
+            ))}
+          </div>
+
+          {leaderboardTab === "friends" && (
+            <>
+              <button
+                onClick={handleInvite}
+                className="w-full mt-4 px-4 py-3 bg-white/10 hover:bg-white/20 border-2 border-white/20 rounded-full text-sm font-semibold transition-all"
+              >
+                ➕ Пригласить друзей
+              </button>
+              {inviteMessage && <p className="text-xs text-[#8fd64b] mt-2 text-center">{inviteMessage}</p>}
+            </>
+          )}
+
+          <p className="text-xs text-[#b9bde0]/60 mt-4 text-center">
+            * В полной версии здесь будут реальные данные всех пользователей
+          </p>
+        </motion.div>
       </div>
     </main>
   );
