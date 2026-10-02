@@ -4,7 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
-/* Звёздочка-искорка */
+/* ✦ Звезда-искорка (Dream) */
 function Star({ className = "" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
@@ -13,165 +13,192 @@ function Star({ className = "" }: { className?: string }) {
   );
 }
 
-/* Наклейка-стикер */
+/* 🏷 Стикер Caveat — нарушает строгую рамку (Dream-вставка в BRUT) */
 function Sticker({ className = "", children }: { className?: string; children: ReactNode }) {
   return (
     <motion.div
-      animate={{ y: [0, -6, 0] }}
-      transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
-      className={`font-sticker absolute z-30 px-3 py-0.5 rounded-lg border-2 border-[#12122b] shadow-[3px_4px_0_rgba(10,10,40,0.4)] text-xl font-bold whitespace-nowrap ${className}`}
+      animate={{ y: [0, -5, 0] }}
+      transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+      className={`font-sticker absolute z-30 px-3 py-0.5 rounded-lg border-2 border-black shadow-[3px_4px_0_rgba(0,0,0,0.35)] text-lg md:text-xl font-bold whitespace-nowrap ${className}`}
     >
       {children}
     </motion.div>
   );
 }
 
-/* Органичные "лепестки" как в референсе */
-function Petals({ className = "", color = "#4d5cf0" }: { className?: string; color?: string }) {
-  return (
-    <svg viewBox="0 0 200 160" className={className} fill={color} aria-hidden>
-      <ellipse cx="55" cy="105" rx="26" ry="62" transform="rotate(-24 55 105)" />
-      <ellipse cx="100" cy="95" rx="28" ry="72" />
-      <ellipse cx="145" cy="105" rx="26" ry="62" transform="rotate(24 145 105)" />
-    </svg>
-  );
-}
-
-/* Пузырь сна с эмодзи */
+/* 💭 Пузырь сна */
 function DreamBubble({ emoji, className = "", delay = 0 }: { emoji: string; className?: string; delay?: number }) {
   return (
     <motion.div
-      animate={{ y: [0, -10, 0] }}
-      transition={{ repeat: Infinity, duration: 4, delay, ease: "easeInOut" }}
-      className={`absolute z-20 flex items-center justify-center rounded-full bg-[#f3f1fb] shadow-xl ${className}`}
+      animate={{ y: [0, -9, 0] }}
+      transition={{ repeat: Infinity, duration: 3.5, delay, ease: "easeInOut" }}
+      className={`absolute z-20 flex items-center justify-center rounded-full bg-[#f4f4f0] border-2 border-black shadow-[3px_3px_0_rgba(0,0,0,0.4)] ${className}`}
     >
       <span>{emoji}</span>
     </motion.div>
   );
 }
 
-export default function Home() {
+/* 🌐 Глобус (BRUT) */
+function GlobeIcon() {
   return (
-    <main className="min-h-screen bg-[#5866f2] flex items-center justify-center p-3 sm:p-6 md:p-10 relative overflow-hidden">
-      {/* Звёзды на фоне */}
-      <Star className="absolute w-6 h-6 text-white top-[6%] left-[5%] animate-pulse" />
-      <Star className="absolute w-4 h-4 text-white top-[12%] right-[8%] animate-pulse" />
-      <Star className="absolute w-5 h-5 text-white bottom-[10%] left-[10%] animate-pulse" />
-      <Star className="absolute w-7 h-7 text-white bottom-[6%] right-[5%] animate-pulse" />
+    <svg viewBox="0 0 100 100" className="w-9 h-9 md:w-12 md:h-12" fill="none" stroke="#111" strokeWidth="5">
+      <circle cx="50" cy="50" r="44" />
+      <ellipse cx="50" cy="50" rx="20" ry="44" />
+      <line x1="6" y1="50" x2="94" y2="50" />
+      <line x1="13" y1="28" x2="87" y2="28" />
+      <line x1="13" y1="72" x2="87" y2="72" />
+    </svg>
+  );
+}
 
-      <div className="relative w-full max-w-6xl">
-        {/* Стикеры по краям карточки */}
-        <Sticker className="-top-4 right-4 md:-top-6 md:-right-6 bg-[#f6b8d0] text-[#12122b] rotate-6">
-          SWEET DREAMS
-        </Sticker>
-        <Sticker className="top-1/3 -right-2 md:-right-10 bg-[#ffd02e] text-[#12122b] rotate-3 hidden sm:block">
-          XP КАПАЕТ ВО СНЕ!
-        </Sticker>
-        <Sticker className="bottom-1/4 -left-2 md:-left-10 bg-[#ff8a3d] text-[#12122b] -rotate-6 hidden sm:block">
-          НЕ БУДИ
-        </Sticker>
-        <Sticker className="-bottom-5 right-10 bg-white text-[#12122b] -rotate-3">
-          Zzz…
-        </Sticker>
+export default function Home() {
+  const mechanics = [
+    { n: "01", title: "Sync data", tag: "Strava / Garmin / Wahoo", cell: "bg-[#ffd500]", icon: "🔌" },
+    { n: "02", title: "XP = Load × IF × Sleep", tag: "Quality over quantity", cell: "bg-[#ff4b26] text-white", icon: "⚡" },
+    { n: "03", title: "Global rating", tag: "Friends & streaks", cell: "bg-[#5866f2] text-white", icon: "🏆" },
+  ];
 
-        {/* Тёмная "сцена" */}
-        <div className="relative rounded-[2rem] bg-[#171a38] overflow-hidden px-4 pt-6 md:px-10 md:pt-8 shadow-2xl">
-          {/* Навигация */}
-          <nav className="relative z-10 flex items-center justify-between gap-2">
-            <Link href="/" className="font-display text-white text-lg md:text-2xl tracking-wide">
-              DREAM<span className="text-[#ffd02e]">✦</span>LEAGUE
-            </Link>
-            <div className="flex items-center gap-1.5 md:gap-2">
-              <Link
-                href="/dashboard"
-                className="px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-[#e9e7f2] text-[#171a38] text-xs md:text-sm font-semibold hover:bg-white transition-colors"
-              >
-                Дашборд
-              </Link>
-              <Link
-                href="/profile"
-                className="px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-[#e9e7f2] text-[#171a38] text-xs md:text-sm font-semibold hover:bg-white transition-colors"
-              >
-                Профиль
-              </Link>
-            </div>
-          </nav>
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-[#171a38] via-[#2a2f6b] to-[#5866f2] p-2 sm:p-4 md:p-6 text-[#111] relative overflow-hidden flex flex-col">
+      {/* ✦ Звёзды на мечтательном фоне (Dream) */}
+      <Star className="absolute w-6 h-6 text-white/80 top-[5%] left-[4%] animate-pulse" />
+      <Star className="absolute w-4 h-4 text-white/70 top-[14%] right-[7%] animate-pulse" />
+      <Star className="absolute w-5 h-5 text-white/80 bottom-[12%] left-[9%] animate-pulse" />
+      <Star className="absolute w-7 h-7 text-[#ffd500] bottom-[6%] right-[5%] animate-pulse" />
+      <Star className="absolute w-3 h-3 text-white/60 top-[40%] left-[2%] animate-pulse" />
 
-          {/* Hero */}
-          <div className="relative z-10 text-center mt-8 md:mt-14 space-y-4 md:space-y-6">
+      {/* 📰 Газетная рамка (BRUT) поверх сна */}
+      <div className="relative max-w-[1400px] w-full mx-auto border-2 border-black bg-[#f4f4f0] flex-1 flex flex-col breathe-table">
+
+        {/* ===== ВЕРХНЯЯ ПАНЕЛЬ (BRUT) ===== */}
+        <div className="flex md:grid md:grid-cols-[auto_1fr_1fr_1fr_auto] border-b-2 border-black">
+          <div className="px-4 py-4 md:border-r-2 border-black font-display text-2xl md:text-3xl">
+            FANTASY<span className="text-[#ff4b26]">.</span>
+          </div>
+          <div className="hidden md:flex items-center px-4 border-r-2 border-black text-[10px] font-bold tracking-widest uppercase leading-relaxed">
+            Season 001<br />Dream league
+          </div>
+          <Link href="/dashboard" className="hidden md:flex items-center px-4 border-r-2 border-black text-[10px] font-bold tracking-widest uppercase hover:bg-black hover:text-white transition-colors">
+            Dashboard
+          </Link>
+          <Link href="/profile" className="hidden md:flex items-center px-4 border-r-2 border-black text-[10px] font-bold tracking-widest uppercase hover:bg-black hover:text-white transition-colors">
+            Profile
+          </Link>
+          <Link href="/dashboard" className="ml-auto md:ml-0 bg-[#ffd500] px-4 py-4 text-[10px] font-bold tracking-widest uppercase flex items-center gap-2 border-l-2 border-black hover:bg-black hover:text-white transition-colors">
+            Start playing ↗
+          </Link>
+        </div>
+
+        {/* ===== HERO ===== */}
+        <div className="relative grid md:grid-cols-2 border-b-2 border-black flex-1">
+
+          {/* Сонные стикеры вылезают за строгую рамку (гибрид) */}
+          <Sticker className="-top-3 left-4 md:left-8 bg-[#f6b8d0] text-black rotate-[-4deg]">sweet dreams</Sticker>
+          <Sticker className="bottom-6 right-4 md:right-8 bg-[#5866f2] text-white rotate-[3deg] z-30">xp капает во сне!</Sticker>
+
+          {/* Левая колонка */}
+          <div className="p-5 md:p-10 flex flex-col gap-6 md:border-r-2 border-black justify-center">
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7 }}
-              className="font-display uppercase text-white text-5xl sm:text-7xl md:text-8xl leading-none"
+              transition={{ duration: 0.6 }}
+              className="font-display uppercase leading-[0.88] text-6xl sm:text-7xl lg:text-8xl"
             >
-              Respect the <span className="text-[#ffd02e]">Sleep</span>
+              We <span className="text-[#5866f2]">dream</span><br />without<br />rules<span className="text-[#ff4b26]">.</span>
             </motion.h1>
 
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3, duration: 0.7 }}
-              className="text-[#b9bde0] text-sm md:text-base max-w-md mx-auto"
-            >
-              Фэнтези-лига для атлетов на выносливость: тренировки приносят XP,
-              сон умножает их, а друзья соревнуются с тобой в рейтинге.
-            </motion.p>
+            <div className="flex items-center gap-3 text-[11px] font-bold tracking-widest uppercase">
+              <span className="w-3 h-3 bg-[#f6b8d0] border-2 border-black inline-block shrink-0"></span>
+              Train by day. Level up by night.
+            </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.7 }}
-              className="flex flex-wrap justify-center gap-3 pb-8 md:pb-10"
-            >
-              <Link
-                href="/dashboard"
-                className="px-6 py-3 rounded-full bg-[#ffd02e] text-[#171a38] font-bold hover:scale-105 transition-transform"
-              >
-                🏆 Начать играть
+            <div className="flex flex-wrap gap-3">
+              <Link href="/dashboard" className="inline-flex items-center gap-3 border-2 border-black px-5 py-3 text-[11px] font-bold tracking-widest uppercase hover:bg-black hover:text-white transition-colors">
+                View dashboard ↗
               </Link>
-              <Link
-                href="/profile"
-                className="px-6 py-3 rounded-full border-2 border-[#e9e7f2]/40 text-[#e9e7f2] font-semibold hover:bg-white/10 transition-colors"
-              >
-                Источники данных
+              <Link href="/profile" className="inline-flex items-center gap-3 bg-[#5866f2] text-white px-5 py-3 text-[11px] font-bold tracking-widest uppercase border-2 border-black hover:bg-black transition-colors">
+                Connect sleep ⚡
               </Link>
-            </motion.div>
+            </div>
           </div>
 
-          {/* Иллюстрация: спящий атлет и сны */}
-          <div className="relative h-56 md:h-72">
-            {/* Розовые облака */}
-            <div className="absolute -left-10 top-4 w-40 h-44 bg-[#f6b8d0] rounded-[50%_50%_40%_60%]" />
-            <div className="absolute right-8 top-8 w-24 h-24 bg-[#f6b8d0] rounded-[60%_40%_55%_45%]" />
+          {/* Правая колонка: оранжевый блок + спящий атлет + пузыри снов */}
+          <div className="relative flex flex-col min-h-[300px] md:min-h-0">
+            <div className="p-5 md:p-8 flex items-start justify-between gap-4 border-b-2 border-black">
+              <p className="text-xs md:text-sm font-bold uppercase tracking-wide max-w-[240px]">
+                A fantasy league where rest is a stat and sleep multiplies your XP.
+              </p>
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="w-9 h-9 border-2 border-black flex items-center justify-center font-bold text-lg">+</span>
+                <span className="w-16 h-16 md:w-20 md:h-20 bg-[#ff4b26] border-2 border-black flex items-center justify-center">
+                  <GlobeIcon />
+                </span>
+              </div>
+            </div>
 
-            {/* Лепестки */}
-            <Petals className="absolute -left-4 -bottom-4 w-52 md:w-72" color="#4d5cf0" />
-            <Petals className="absolute left-1/2 -translate-x-1/2 -bottom-8 w-56 md:w-80" color="#2e3ab0" />
-            <Petals className="absolute -right-4 -bottom-4 w-52 md:w-72" color="#4d5cf0" />
+            {/* "Фото" атлета в оранжевом (BRUT) с мечтательными пузырями (Dream) */}
+                        
+                        {/* "Фото" атлета в оранжевом (BRUT) с мечтательными пузырями (Dream) */}
+            <div className="relative flex-1 bg-[#ff4b26] overflow-hidden flex items-center justify-center">
+              {/* розовые облака-пятна (Dream) — фон по углам */}
+              <div className="absolute -left-6 top-6 w-28 h-32 bg-[#f6b8d0] rounded-[50%_50%_40%_60%] opacity-90 z-0" />
+              <div className="absolute right-4 top-10 w-16 h-16 bg-[#f6b8d0] rounded-[60%_40%_55%_45%] opacity-90 z-0" />
 
-            {/* Зелёный росток */}
-            <div className="absolute left-[22%] -bottom-2 w-14 h-24 bg-[#8fd64b] rounded-t-full" />
+              {/* ЕДИНАЯ КОМПОЗИЦИЯ: атлет + пузыри */}
+              <div className="relative z-10 flex flex-col items-center justify-center">
+                
+                {/* 💭 Пузыри снов — дуга над головой внутри композиции */}
+                <div className="relative w-full h-24 md:h-32 mb-[-1rem] md:mb-[-2rem]">
+                  <DreamBubble emoji="🚴" className="w-12 h-12 md:w-16 md:h-16 text-2xl md:text-3xl left-[-10%] bottom-[10%]" delay={0.2} />
+                  <DreamBubble emoji="🏃" className="w-10 h-10 md:w-14 md:h-14 text-xl md:text-2xl left-1/2 -translate-x-1/2 bottom-[60%]" delay={1} />
+                  <DreamBubble emoji="🏆" className="w-12 h-12 md:w-16 md:h-16 text-2xl md:text-3xl right-[-10%] bottom-[10%]" delay={0.6} />
+                  
+                  {/* ✦ Звёзды вокруг головы */}
+                  <Star className="absolute w-5 h-5 text-white left-[-25%] bottom-[40%] animate-pulse" />
+                  <Star className="absolute w-4 h-4 text-[#ffd500] right-[-25%] bottom-[45%] animate-pulse" />
+                </div>
 
-            {/* Спящий атлет */}
-            <motion.div
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-              className="absolute left-1/2 -translate-x-1/2 bottom-4 text-7xl md:text-8xl z-10"
-            >
-              😴
-            </motion.div>
-
-            {/* Пузыри снов */}
-            <DreamBubble emoji="🚴" className="w-12 h-12 md:w-16 md:h-16 text-2xl md:text-3xl left-[28%] top-6" delay={0.3} />
-            <DreamBubble emoji="🏃" className="w-10 h-10 md:w-14 md:h-14 text-xl md:text-2xl left-[48%] top-0" delay={1.1} />
-            <DreamBubble emoji="🏆" className="w-12 h-12 md:w-16 md:h-16 text-2xl md:text-3xl left-[64%] top-8" delay={0.7} />
-
-            {/* Звёзды внутри сцены */}
-            <Star className="absolute w-5 h-5 text-white left-[18%] top-10 animate-pulse" />
-            <Star className="absolute w-4 h-4 text-white right-[22%] top-4 animate-pulse" />
-            <Star className="absolute w-3 h-3 text-white right-[38%] top-16 animate-pulse" />
+                {/* Спящий атлет ч/б (BRUT-обработка) */}
+                <motion.span
+                  animate={{ scale: [1, 1.04, 1] }}
+                  transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                  className="text-[8rem] md:text-[11rem] leading-none contrast-125 select-none"
+                >
+                  😴
+                </motion.span>
+              </div>
+            </div>
           </div>
+        </div>
+
+        {/* ===== ЛЕНТА (BRUT-структура + Dream-цвета) ===== */}
+        <div className="grid md:grid-cols-[auto_1fr_auto] border-b-2 border-black">
+          <div className="hidden md:flex items-center justify-center px-3 border-r-2 border-black">
+            <span className="[writing-mode:vertical-rl] rotate-180 text-[11px] font-bold tracking-widest">(2026)</span>
+          </div>
+          <div className="px-5 py-5 md:py-6 flex items-center justify-between gap-4 text-sm md:text-lg font-bold uppercase tracking-wide">
+            <span>We don't follow pacers.<br />We set the dream.</span>
+            <span className="text-2xl">→</span>
+          </div>
+          <div className="bg-[#5866f2] text-white border-t-2 md:border-t-0 md:border-l-2 border-black px-5 py-4 flex items-center justify-between gap-6 text-[11px] font-bold tracking-widest uppercase">
+            <span>Open for<br />new dreamers</span>
+            <span className="w-4 h-4 bg-[#ffd500] rounded-full inline-block shrink-0"></span>
+          </div>
+        </div>
+
+        {/* ===== МЕХАНИКИ 01/02/03 (BRUT-сетка, Dream-палитра ячеек) ===== */}
+        <div className="grid md:grid-cols-3">
+          {mechanics.map((m, i) => (
+            <div key={m.n} className={`flex items-center gap-4 p-5 md:p-6 ${i < mechanics.length - 1 ? "border-b-2 md:border-b-0 md:border-r-2" : ""} border-black ${m.cell}`}>
+              <span className="font-display text-5xl md:text-6xl shrink-0">{m.n}</span>
+              <div className="min-w-0">
+                <p className="font-bold uppercase tracking-wide text-sm md:text-base truncate">{m.title}</p>
+                <p className="text-[10px] font-bold tracking-widest uppercase mt-1 opacity-80">{m.tag}</p>
+              </div>
+              <span className="text-2xl ml-auto shrink-0">{m.icon}</span>
+            </div>
+          ))}
         </div>
       </div>
     </main>

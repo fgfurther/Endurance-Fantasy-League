@@ -21,14 +21,14 @@ export default function ActivityCard({ act }: { act: Activity }) {
 
   const multiplier = act.intensity_multiplier || 1.0;
   const multiplierColor =
-    multiplier >= 1.2 ? "text-[#ff8a3d]" :
-    multiplier >= 1.0 ? "text-[#ffd02e]" :
-    multiplier >= 0.7 ? "text-[#8fd64b]" : "text-[#7c8cff]";
+    multiplier >= 1.2 ? "text-[#ff4b26]" :
+    multiplier >= 1.0 ? "text-black" :
+    multiplier >= 0.7 ? "text-[#666]" : "text-[#5866f2]";
 
   const multiplierLabel =
-    multiplier >= 1.2 ? "🔥 Высокая" :
-    multiplier >= 1.0 ? "⚡ Средняя" :
-    multiplier >= 0.7 ? "🌿 Низкая" : "💤 Восстановление";
+    multiplier >= 1.2 ? "HIGH" :
+    multiplier >= 1.0 ? "MEDIUM" :
+    multiplier >= 0.7 ? "LOW" : "RECOVERY";
 
   const sleepMult = Number(act.sleep_multiplier ?? 1);
 
@@ -45,66 +45,64 @@ export default function ActivityCard({ act }: { act: Activity }) {
 
   return (
     <div
-      className="group relative flex justify-between items-center gap-3 p-3 md:p-4 bg-white/5 rounded-2xl border-2 border-transparent hover:border-[#ffd02e]/60 hover:bg-white/10 transition-all duration-300 cursor-pointer hover:scale-[1.02] active:scale-[0.98] touch-manipulation"
+      className="group relative grid grid-cols-[auto_1fr_auto] items-center gap-0 border-2 border-black bg-white hover:bg-[#5866f2]/10 hover:border-[#5866f2] transition-colors cursor-pointer touch-manipulation"
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchMove}
     >
-      <div className="flex items-center gap-3 md:gap-4 min-w-0">
-        <div className="text-2xl md:text-3xl shrink-0">
-          {act.sport === "RUN" ? "🏃" :
-           act.sport === "RIDE" ? "🚴" :
-           act.sport === "SWIM" ? "🏊" :
-           act.sport === "SKATEBOARD" ? "🛹" : "🏋️"}
-        </div>
-        <div className="min-w-0">
-          <p className="font-semibold text-white truncate">{act.name}</p>
-          <p className="text-sm text-[#b9bde0]">
-            {act.date} • {act.distance_km} км • {act.moving_time_min} мин
-          </p>
-        </div>
+      <div className="w-12 h-12 md:w-14 md:h-14 border-r-2 border-black flex items-center justify-center text-xl md:text-2xl bg-[#f4f4f0]">
+        {act.sport === "RUN" ? "🏃" :
+         act.sport === "RIDE" ? "🚴" :
+         act.sport === "SWIM" ? "🏊" :
+         act.sport === "SKATEBOARD" ? "🛹" : "🏋️"}
       </div>
 
-      <div className="text-right shrink-0">
-        <p className="font-display text-xl md:text-2xl text-[#ffd02e]">+{Math.round(act.xp)}</p>
-        <p className="text-[10px] text-[#b9bde0] uppercase tracking-widest">XP · {act.sport}</p>
+      <div className="px-3 md:px-4 py-2 min-w-0">
+        <p className="font-bold uppercase tracking-wide truncate text-sm md:text-base">{act.name}</p>
+        <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-[#666] mt-0.5">
+          {act.date} · {act.distance_km} km · {act.moving_time_min} min
+        </p>
       </div>
 
-      {/* Tooltip */}
+      <div className="px-3 md:px-4 py-2 border-l-2 border-black text-right bg-[#f4f4f0]">
+        <p className="font-display text-lg md:text-xl text-[#ff4b26]">+{Math.round(act.xp)}</p>
+        <p className="text-[9px] font-bold tracking-widest uppercase text-[#666]">XP</p>
+      </div>
+
+      {/* Tooltip — тёмно-синий (Dream) с чёрной рамкой и BRUT-тенью */}
       <div
         className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 transition-all duration-200 pointer-events-none z-30 ${
           showTooltip ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
         }`}
       >
-        <div className="bg-[#12122b] border-2 border-[#ffd02e] rounded-xl p-3 shadow-xl min-w-[210px]">
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-[#b9bde0]">Базовый XP:</span>
-              <span className="text-white font-mono">{Math.round(act.base_xp)}</span>
+        <div className="bg-[#171a38] text-white border-2 border-black p-3 shadow-[4px_4px_0_#000] min-w-[220px] text-sm">
+          <div className="space-y-1.5">
+            <div className="flex justify-between border-b border-white/20 pb-1">
+              <span className="text-[9px] font-bold tracking-widest uppercase text-white/60">Base XP</span>
+              <span className="font-grotesk font-bold">{Math.round(act.base_xp)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-[#b9bde0]">Интенсивность:</span>
-              <span className={`font-mono font-bold ${multiplierColor}`}>×{multiplier.toFixed(2)}</span>
+              <span className="text-[9px] font-bold tracking-widest uppercase text-white/60">Intensity</span>
+              <span className={`font-grotesk font-bold ${multiplierColor}`}>×{multiplier.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-[#b9bde0]">Нагрузка:</span>
-              <span className={`text-xs ${multiplierColor}`}>{multiplierLabel}</span>
+              <span className="text-[9px] font-bold tracking-widest uppercase text-white/60">Load</span>
+              <span className={`text-[10px] font-bold tracking-widest uppercase ${multiplierColor}`}>{multiplierLabel}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-[#b9bde0]">Сон:</span>
-              <span className="font-mono font-bold text-[#7c8cff]">
-                {act.sleep_hours != null ? `${act.sleep_hours}ч ` : ""}×{sleepMult.toFixed(2)}
+              <span className="text-[9px] font-bold tracking-widest uppercase text-white/60">Sleep</span>
+              <span className="font-grotesk font-bold text-[#f6b8d0]">
+                {act.sleep_hours != null ? `${act.sleep_hours}h ` : ""}×{sleepMult.toFixed(2)}
               </span>
             </div>
-            <div className="border-t border-white/10 pt-2 flex justify-between">
-              <span className="text-[#b9bde0]">Итого:</span>
-              <span className="font-display text-[#ffd02e]">+{Math.round(act.xp)} XP</span>
+            <div className="border-t-2 border-black pt-1.5 flex justify-between">
+              <span className="text-[9px] font-bold tracking-widest uppercase text-white/60">Total</span>
+              <span className="font-display text-[#ffd500]">+{Math.round(act.xp)} XP</span>
             </div>
           </div>
         </div>
-        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-[#12122b] border-r-2 border-b-2 border-[#ffd02e] rotate-45"></div>
       </div>
     </div>
   );
