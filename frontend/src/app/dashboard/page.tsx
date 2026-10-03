@@ -153,7 +153,7 @@ export default function Dashboard() {
 
         {/* Заголовок + стикер, вылезающий за рамку */}
         <div className="relative grid md:grid-cols-[1fr_auto] border-b-2 border-black">
-          <Sticker className="-top-1 right-4 md:right-10 bg-[#f6b8d0] text-black rotate-[-4deg]">sweet dreams 🌙</Sticker>
+          <Sticker className="top-2 right-4 md:right-10 bg-[#f6b8d0] text-black rotate-[-4deg]">don't stop fighting 🔥</Sticker>
           <div className="p-5 md:p-8 flex flex-col gap-3 md:border-r-2 border-black">
             <Label className="text-[#666]">Season 001 · Athlete: {data.user.name}</Label>
             <h1 className="font-display uppercase leading-[0.9] text-4xl md:text-6xl lg:text-7xl">
@@ -218,11 +218,12 @@ export default function Dashboard() {
         {/* Рейтинг */}
         <div className="border-b-2 border-black">
           <div className="relative grid md:grid-cols-[200px_1fr]">
-            <Sticker className="-top-3 right-4 bg-[#5866f2] text-white rotate-[3deg] z-30">who's dreaming? 👀</Sticker>
+            <Sticker className="-top-3 right-4 bg-[#5866f2] text-white rotate-[3deg] z-30">who's here? 👀</Sticker>
             <div className="hidden md:flex flex-col justify-between p-5 border-r-2 border-black bg-[#5866f2] text-white">
               <div>
-                <div className="px-4 py-3 border-b-2 border-black font-display uppercase text-xl md:text-2xl tracking-tight">Rating</div>
-                <Label className="mt-4 block text-white/80">Global & Friends</Label>
+                <p className="font-display uppercase text-xl md:text-2xl tracking-tight leading-none">Rating</p>
+                <div className="h-0.5 bg-black mt-3 mb-4"></div>
+                <Label className="block text-white/80">Global & Friends</Label>
               </div>
               <span className="font-display text-4xl mt-auto">↓</span>
             </div>
@@ -300,8 +301,9 @@ export default function Dashboard() {
             <div className="grid md:grid-cols-[200px_1fr]">
               <div className="hidden md:flex flex-col justify-between p-5 border-r-2 border-black bg-[#f4f4f0]">
                 <div>
-                  <SectionTitle>XP Dynamics</SectionTitle>
-                  <Label className="text-[#666] mt-4 block">Last {chartData.length} workouts</Label>
+                  <p className="font-display uppercase text-xl md:text-2xl tracking-tight leading-none">XP Dynamics</p>
+                  <div className="h-0.5 bg-black mt-3 mb-4"></div>
+                  <Label className="text-[#666] block">Last {chartData.length} workouts</Label>
                 </div>
                 <span className="font-display text-4xl mt-auto">↓</span>
               </div>
@@ -337,8 +339,9 @@ export default function Dashboard() {
           <div className="grid md:grid-cols-[200px_1fr]">
             <div className="hidden md:flex flex-col justify-between p-5 border-r-2 border-black bg-[#ff4b26] text-white">
               <div>
-                <div className="px-4 py-3 border-b-2 border-black font-display uppercase text-xl md:text-2xl tracking-tight">Workouts</div>
-                <Label className="mt-4 block text-white/80">Hover / long press for details</Label>
+                <p className="font-display uppercase text-xl md:text-2xl tracking-tight leading-none">Workouts</p>
+                <div className="h-0.5 bg-black mt-3 mb-4"></div>
+                <Label className="block text-white/80">Hover / long press for details</Label>
               </div>
               <span className="font-display text-4xl mt-auto">↓</span>
             </div>

@@ -34,7 +34,7 @@ export default function Header() {
             <div className="hidden md:flex items-center px-5 border-r-2 border-black text-[10px] font-bold tracking-widest uppercase leading-relaxed">
               Season 001
               <br />
-              Dream league
+              Endurance Fantasy league
             </div>
 
             <nav className="flex items-stretch ml-auto">

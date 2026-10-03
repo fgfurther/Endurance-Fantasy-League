@@ -134,9 +134,9 @@ export default function Profile() {
       <div className="relative max-w-[1400px] w-full mx-auto border-2 border-t-0 border-black bg-[#f4f4f0] flex-1 flex flex-col breathe-table">
         {/* Заголовок + стикер */}
         <div className="relative grid md:grid-cols-[1fr_auto] border-b-2 border-black">
-          <Sticker className="-top-1 right-6 bg-[#f6b8d0] text-black rotate-[-4deg]">athlete file 📁</Sticker>
+          <Sticker className="top-2 right-6 bg-[#f6b8d0] text-black rotate-[-4deg]">athlete file 📁</Sticker>
           <div className="p-5 md:p-8 flex flex-col gap-3 md:border-r-2 border-black">
-            <Label className="text-[#666]">Dream cabinet</Label>
+            <Label className="text-[#666]">Endurance cabinet</Label>
             <h1 className="font-display uppercase leading-[0.9] text-4xl md:text-6xl lg:text-7xl">
               Profile<span className="text-[#ff4b26]">.</span>
             </h1>
@@ -228,8 +228,9 @@ export default function Profile() {
           <div className="grid md:grid-cols-[200px_1fr]">
             <div className="hidden md:flex flex-col justify-between p-5 border-r-2 border-black bg-[#5866f2] text-white">
               <div>
-                <div className="px-4 py-3 border-b-2 border-black font-display uppercase text-xl md:text-2xl tracking-tight">Sources</div>
-                <Label className="mt-4 block text-white/80">Connect & sync</Label>
+                <p className="font-display uppercase text-xl md:text-2xl tracking-tight leading-none">Sources</p>
+                <div className="h-0.5 bg-black mt-3 mb-4"></div>
+                <Label className="block text-white/80">Connect & sync</Label>
               </div>
               <span className="font-display text-4xl mt-auto">↓</span>
             </div>

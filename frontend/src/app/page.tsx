@@ -77,7 +77,7 @@ export default function Home() {
             FANTASY<span className="text-[#ff4b26]">.</span>
           </div>
           <div className="hidden md:flex items-center px-4 border-r-2 border-black text-[10px] font-bold tracking-widest uppercase leading-relaxed">
-            Season 001<br />Dream league
+            Season 001<br />Endurance Fantasy league
           </div>
           <Link href="/dashboard" className="hidden md:flex items-center px-4 border-r-2 border-black text-[10px] font-bold tracking-widest uppercase hover:bg-black hover:text-white transition-colors">
             Dashboard
@@ -94,8 +94,8 @@ export default function Home() {
         <div className="relative grid md:grid-cols-2 border-b-2 border-black flex-1">
 
           {/* Сонные стикеры вылезают за строгую рамку (гибрид) */}
-          <Sticker className="-top-3 left-4 md:left-8 bg-[#f6b8d0] text-black rotate-[-4deg]">sweet dreams</Sticker>
-          <Sticker className="bottom-6 right-4 md:right-8 bg-[#5866f2] text-white rotate-[3deg] z-30">xp капает во сне!</Sticker>
+          <Sticker className="-top-3 left-4 md:left-8 bg-[#f6b8d0] text-black rotate-[-4deg]">RideMachineCC</Sticker>
+          <Sticker className="bottom-6 right-4 md:right-8 bg-[#5866f2] text-white rotate-[3deg] z-30">xp капает за сон!</Sticker>
 
           {/* Левая колонка */}
           <div className="p-5 md:p-10 flex flex-col gap-6 md:border-r-2 border-black justify-center">
@@ -105,12 +105,12 @@ export default function Home() {
               transition={{ duration: 0.6 }}
               className="font-display uppercase leading-[0.88] text-6xl sm:text-7xl lg:text-8xl"
             >
-              We <span className="text-[#5866f2]">dream</span><br />without<br />rules<span className="text-[#ff4b26]">.</span>
+              train <span className="text-[#5866f2]">hard</span><br />rest<br />harder<span className="text-[#ff4b26]">.</span>
             </motion.h1>
 
             <div className="flex items-center gap-3 text-[11px] font-bold tracking-widest uppercase">
               <span className="w-3 h-3 bg-[#f6b8d0] border-2 border-black inline-block shrink-0"></span>
-              Train by day. Level up by night.
+              RideMachine Endurance Fantasy league.
             </div>
 
             <div className="flex flex-wrap gap-3">
@@ -118,7 +118,7 @@ export default function Home() {
                 View dashboard ↗
               </Link>
               <Link href="/profile" className="inline-flex items-center gap-3 bg-[#5866f2] text-white px-5 py-3 text-[11px] font-bold tracking-widest uppercase border-2 border-black hover:bg-black transition-colors">
-                Connect sleep ⚡
+                Connect source ⚡
               </Link>
             </div>
           </div>
@@ -127,7 +127,7 @@ export default function Home() {
           <div className="relative flex flex-col min-h-[300px] md:min-h-0">
             <div className="p-5 md:p-8 flex items-start justify-between gap-4 border-b-2 border-black">
               <p className="text-xs md:text-sm font-bold uppercase tracking-wide max-w-[240px]">
-                A fantasy league where rest is a stat and sleep multiplies your XP.
+                A fantasy league where training plan and rest multiplies your workout.
               </p>
               <div className="flex items-center gap-3 shrink-0">
                 <span className="w-9 h-9 border-2 border-black flex items-center justify-center font-bold text-lg">+</span>
@@ -178,11 +178,11 @@ export default function Home() {
             <span className="[writing-mode:vertical-rl] rotate-180 text-[11px] font-bold tracking-widest">(2026)</span>
           </div>
           <div className="px-5 py-5 md:py-6 flex items-center justify-between gap-4 text-sm md:text-lg font-bold uppercase tracking-wide">
-            <span>We don't follow pacers.<br />We set the dream.</span>
+            <span>We don't follow chaos.<br />We set the plan.</span>
             <span className="text-2xl">→</span>
           </div>
           <div className="bg-[#5866f2] text-white border-t-2 md:border-t-0 md:border-l-2 border-black px-5 py-4 flex items-center justify-between gap-6 text-[11px] font-bold tracking-widest uppercase">
-            <span>Open for<br />new dreamers</span>
+            <span>Open for<br />new athletes</span>
             <span className="w-4 h-4 bg-[#ffd500] rounded-full inline-block shrink-0"></span>
           </div>
         </div>
