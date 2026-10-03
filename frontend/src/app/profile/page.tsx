@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-
+import { authApi } from "@/lib/auth";
 import { getCachedUser, subscribeUser, refreshUser, clearUserCache } from "@/lib/apiCache";
 import type { ReactNode } from "react";
 import { Star, Sticker, DreamBubble } from "@/components/DreamBits";

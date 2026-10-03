@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { axios as _unused } from "axios"; // не используется
 import { authApi, setToken } from "@/lib/auth";
 import { Star, Sticker } from "@/components/DreamBits";
 
