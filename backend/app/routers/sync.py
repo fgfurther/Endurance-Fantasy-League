@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from ..dependencies import get_current_user
+from ..auth import decrypt_secret
 from ..database import get_db
 from ..models import User, Activity, Wellness
 from ..services.intervals import (
@@ -179,183 +181,156 @@ def _safe_int(v):
 async def sync_activities(
     oldest: str | None = None,
     newest: str | None = None,
+    current: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Синхронизирует тренировки из Intervals.icu и начисляет XP"""
-    athlete_user = None  # не называем user до присвоения из БД
-    try:
-        activities_data = await fetch_athlete_activities(oldest=oldest, newest=newest)
-        if not activities_data:
-            activities_data = await fetch_athlete_activities_csv(oldest=oldest)
-
-        if not activities_data:
-            return {"message": "Нет активностей для синхронизации", "synced_count": 0}
-
-        # ---- единственное место, где берём пользователя ----
-        athlete_user = (
-            db.query(User)
-            .filter(User.intervals_id == settings.INTERVALS_ATHLETE_ID)
-            .first()
-        )
-        if athlete_user is None:
-            athlete_user = User(
-                intervals_id=settings.INTERVALS_ATHLETE_ID,
-                firstname="Demo",
-                lastname="Athlete",
-                total_xp=0.0,
-                level=1,
-            )
-            db.add(athlete_user)
-            db.commit()
-            db.refresh(athlete_user)
-
-        sleep_by_date: dict = {}
-        try:
-            sleep_by_date = await _sync_wellness_for_user(
-                db, athlete_user, oldest, newest
-            )
-            print(f"😴 Wellness: {len(sleep_by_date)} дней со сном")
-        except Exception as e:
-            print(f"⚠️ Wellness skip: {type(e).__name__}: {e}")
-            db.rollback()
-            athlete_user = (
-                db.query(User)
-                .filter(User.intervals_id == settings.INTERVALS_ATHLETE_ID)
-                .first()
-            )
-            sleep_by_date = {}
-
-        if athlete_user is None:
-            raise HTTPException(status_code=500, detail="User lost after rollback")
-
-        new_xp = 0.0
-        synced_count = 0
-        skipped_empty = 0
-        seen_ids: set[str] = set()
-
-        existing_ids = {
-            row[0]
-            for row in db.query(Activity.intervals_activity_id)
-            .filter(Activity.user_id == athlete_user.id)
-            .all()
-        }
-
-        for raw in activities_data:
-            if not isinstance(raw, dict):
-                continue
-
-            parsed = _parse_activity(raw)
-            if not parsed:
-                continue
-
-            act_id = parsed["intervals_activity_id"]
-            if act_id in seen_ids or act_id in existing_ids:
-                continue
-            seen_ids.add(act_id)
-
-            if not _has_real_data(parsed):
-                skipped_empty += 1
-                continue
-
-            act_date = parsed["start_date"].strftime("%Y-%m-%d")
-            sleep_secs = sleep_by_date.get(act_date)
-            if sleep_secs is None:
-                from datetime import timedelta
-
-                prev = (parsed["start_date"] - timedelta(days=1)).strftime("%Y-%m-%d")
-                sleep_secs = sleep_by_date.get(prev)
-
-            try:
-                s_mult = sleep_multiplier(sleep_secs)
-            except NameError:
-                s_mult = 1.0
-
-            xp_earned = round(
-                float(parsed["base_xp"])
-                * float(parsed["intensity_multiplier"])
-                * float(s_mult),
-                2,
-            )
-
-            new_activity = Activity(
-                user_id=athlete_user.id,
-                intervals_activity_id=act_id,
-                name=parsed["name"],
-                sport_type=parsed["sport_type"],
-                distance=parsed["distance"],
-                moving_time=parsed["moving_time"],
-                elevation_gain=parsed["elevation_gain"],
-                average_heartrate=parsed.get("average_heartrate") or 0,
-                base_xp=parsed["base_xp"],
-                intensity_multiplier=parsed["intensity_multiplier"],
-                sleep_multiplier=s_mult,
-                sleep_secs=sleep_secs,
-                xp_earned=xp_earned,
-                start_date=parsed["start_date"],
-            )
-            # если нет колонок sleep_* — убери sleep_multiplier= и sleep_secs= из Activity()
-
-            db.add(new_activity)
-            existing_ids.add(act_id)
-            new_xp += xp_earned
-            synced_count += 1
-
-            dist_km = parsed["distance"] / 1000 if parsed["distance"] else 0
-            sleep_h = round(sleep_secs / 3600, 1) if sleep_secs else None
-            print(
-                f"✅ {parsed['name']} | {parsed['sport_type']} | "
-                f"{dist_km:.1f}km | sleep={sleep_h}h ×{s_mult} | +{xp_earned} XP"
-            )
-
-        db.commit()
-
-        if new_xp > 0 and athlete_user is not None:
-            athlete_user.total_xp = float(athlete_user.total_xp or 0) + new_xp
-            athlete_user.level = int((athlete_user.total_xp / 100) ** 0.5) + 1
-            db.commit()
-            db.refresh(athlete_user)
-
-        return {
-            "message": "Синхронизация успешна!",
-            "synced_count": synced_count,
-            "skipped_empty": skipped_empty,
-            "new_xp": round(new_xp, 2),
-            "user": {
-                "id": athlete_user.id,
-                "name": f"{athlete_user.firstname} {athlete_user.lastname}",
-                "level": athlete_user.level,
-                "total_xp": round(float(athlete_user.total_xp or 0), 2),
-            },
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-
-        traceback.print_exc()
-        db.rollback()
+    """Синхронизирует тренировки ТЕКУЩЕГО пользователя его ключом Intervals."""
+    from ..auth import decrypt_secret
+    from ..services.intervals import fetch_activities_for_user, fetch_wellness_for_user
+    
+    if not current.api_key_encrypted or not current.intervals_id:
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка синхронизации: {type(e).__name__}: {e}",
+            status_code=400,
+            detail="Сначала привяжи Intervals.icu в профиле",
         )
+    
+    try:
+        api_key = decrypt_secret(current.api_key_encrypted)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Не удалось расшифровать ключ. Подключи заново.")
+    
+    athlete_id = current.intervals_id
+    
+    # ── Тянем активности этим юзером/ключом ──
+    try:
+        activities_data = await fetch_activities_for_user(
+            api_key=api_key, athlete_id=athlete_id, oldest=oldest, newest=newest
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Intervals.icu недоступен: {type(e).__name__}")
+    
+    if not activities_data:
+        return {"message": "Нет активностей для синхронизации", "synced_count": 0, "new_xp": 0}
+    
+    # ── Тянем wellness этим же юзером ──
+    sleep_by_date: dict = {}
+    try:
+        wellness_records = await fetch_wellness_for_user(
+            api_key=api_key, athlete_id=athlete_id, oldest=oldest, newest=newest
+        )
+        for row in wellness_records:
+            if not isinstance(row, dict):
+                continue
+            date_str = str(row.get("id") or row.get("date") or "").strip()[:10]
+            if len(date_str) < 10:
+                continue
+            raw_sleep = row.get("sleepSecs") if row.get("sleepSecs") is not None else row.get("sleep_secs")
+            try:
+                secs = int(raw_sleep) if raw_sleep is not None else None
+            except (TypeError, ValueError):
+                secs = None
+            if secs is not None and secs > 0:
+                sleep_by_date[date_str] = secs
+    except Exception as e:
+        print(f"⚠️ Wellness skip: {type(e).__name__}: {e}")
+    
+    # ── Пишем в БД ──
+    new_xp = 0.0
+    synced_count = 0
+    skipped_empty = 0
+    seen_ids: set[str] = set()
+    
+    existing_ids = {
+        row[0] for row in db.query(Activity.intervals_activity_id)
+        .filter(Activity.user_id == current.id).all()
+    }
+    
+    for raw in activities_data:
+        if not isinstance(raw, dict):
+            continue
+        parsed = _parse_activity(raw)
+        if not parsed:
+            continue
+        act_id = parsed["intervals_activity_id"]
+        if act_id in seen_ids or act_id in existing_ids:
+            continue
+        seen_ids.add(act_id)
+        if not _has_real_data(parsed):
+            skipped_empty += 1
+            continue
+        
+        act_date = parsed["start_date"].strftime("%Y-%m-%d")
+        sleep_secs = sleep_by_date.get(act_date)
+        if sleep_secs is None:
+            prev = (parsed["start_date"] - timedelta(days=1)).strftime("%Y-%m-%d")
+            sleep_secs = sleep_by_date.get(prev)
+        
+        try:
+            s_mult = sleep_multiplier(sleep_secs)
+        except NameError:
+            s_mult = 1.0
+        
+        xp_earned = round(float(parsed["base_xp"]) * float(parsed["intensity_multiplier"]) * float(s_mult), 2)
+        
+        new_activity = Activity(
+            user_id=current.id,
+            intervals_activity_id=act_id,
+            name=parsed["name"],
+            sport_type=parsed["sport_type"],
+            distance=parsed["distance"],
+            moving_time=parsed["moving_time"],
+            elevation_gain=parsed["elevation_gain"],
+            average_heartrate=parsed.get("average_heartrate") or 0,
+            base_xp=parsed["base_xp"],
+            intensity_multiplier=parsed["intensity_multiplier"],
+            sleep_multiplier=s_mult,
+            sleep_secs=sleep_secs,
+            xp_earned=xp_earned,
+            start_date=parsed["start_date"],
+        )
+        db.add(new_activity)
+        existing_ids.add(act_id)
+        new_xp += xp_earned
+        synced_count += 1
+    
+    db.commit()
+    
+    if new_xp > 0:
+        current.total_xp = float(current.total_xp or 0) + new_xp
+        current.level = int((current.total_xp / 100) ** 0.5) + 1
+        db.commit()
+        db.refresh(current)
+    
+    return {
+        "message": "Синхронизация успешна!",
+        "synced_count": synced_count,
+        "skipped_empty": skipped_empty,
+        "new_xp": round(new_xp, 2),
+        "user": {
+            "id": current.id,
+            "name": current.display_name,
+            "level": current.level,
+            "total_xp": round(float(current.total_xp or 0), 2),
+        },
+    }
 
 
 @router.get("/user")
-async def get_user(db: Session = Depends(get_db)):
-    """Получает данные текущего пользователя"""
-    user = db.query(User).filter(User.intervals_id == settings.INTERVALS_ATHLETE_ID).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден. Сначала выполните POST /api/sync")
+async def get_user_profile(
+    current: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Данные ТЕКУЩЕГО пользователя."""
+    user = current
     
-    # Получаем последние 10 активностей
     activities = db.query(Activity).filter(Activity.user_id == user.id).order_by(Activity.start_date.desc()).limit(40).all()
-
-        # === РАСЧЁТ СТРИКОВ И НЕДЕЛЬНОЙ ЦЕЛИ ===
     all_activities = db.query(Activity).filter(Activity.user_id == user.id).all()
     today = datetime.utcnow().date()
-
-    # Стрик дней (подряд идущие дни с тренировками)
+    
     dates = sorted({a.start_date.date() for a in all_activities if a.start_date}, reverse=True)
     day_streak = 0
     if dates and (today - dates[0]).days <= 1:
@@ -365,11 +340,10 @@ async def get_user(db: Session = Depends(get_db)):
                 day_streak += 1
             else:
                 break
-
-    # Стрик недель
+    
     def week_start(d):
-        return d - timedelta(days=d.weekday())  # понедельник текущей недели
-
+        return d - timedelta(days=d.weekday())
+    
     weeks = sorted({week_start(a.start_date.date()) for a in all_activities if a.start_date}, reverse=True)
     this_week = week_start(today)
     week_streak = 0
@@ -380,18 +354,11 @@ async def get_user(db: Session = Depends(get_db)):
                 week_streak += 1
             else:
                 break
-
-    # Часы тренировок за текущую неделю
-    week_seconds = sum(
-        a.moving_time or 0
-        for a in all_activities
-        if a.start_date and week_start(a.start_date.date()) == this_week
-    )
+    
+    week_seconds = sum(a.moving_time or 0 for a in all_activities if a.start_date and week_start(a.start_date.date()) == this_week)
     week_hours = round(week_seconds / 3600, 1)
-
-    # === СТАТИСТИКА СЕЗОНА ===
-    SEASON_START = datetime(2026, 9, 1)  # Старт 1-го сезона Fantasy League
-
+    
+    SEASON_START = datetime(2026, 9, 1)
     season_acts = [a for a in all_activities if a.start_date and a.start_date >= SEASON_START]
     season_stats = {
         "season_start": SEASON_START.strftime("%d.%m.%Y"),
@@ -404,10 +371,14 @@ async def get_user(db: Session = Depends(get_db)):
     
     return {
         "user": {
-            "name": f"{user.firstname} {user.lastname}",
+            "id": user.id,
+            "name": user.display_name,
+            "username": user.username,
             "level": user.level,
-            "total_xp": round(user.total_xp, 2),
-            "xp_to_next_level": round(((user.level) ** 2) * 100 - user.total_xp, 2)
+            "total_xp": round(float(user.total_xp or 0), 2),
+            "xp_to_next_level": round(((user.level) ** 2) * 100 - float(user.total_xp or 0), 2),
+            "has_intervals_key": bool(user.api_key_encrypted),
+            "intervals_id": user.intervals_id,
         },
         "stats": {
             "day_streak": day_streak,
@@ -625,40 +596,83 @@ async def get_wellness(
 
 
 @router.delete("/reset")
-async def reset_all_data(db: Session = Depends(get_db)):
-    """Полная очистка activities (+ wellness, если есть) и обнуление XP. Только для MVP."""
-    user = db.query(User).filter(User.intervals_id == settings.INTERVALS_ATHLETE_ID).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
-
-    deleted_activities = (
-        db.query(Activity)
-        .filter(Activity.user_id == user.id)
-        .delete(synchronize_session=False)
-    )
-
+async def reset_all_data(
+    current: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Очистка данных ТЕКУЩЕГО пользователя."""
+    deleted_activities = db.query(Activity).filter(Activity.user_id == current.id).delete(synchronize_session=False)
     deleted_wellness = 0
     try:
         from ..models import Wellness
-        deleted_wellness = (
-            db.query(Wellness)
-            .filter(Wellness.user_id == user.id)
-            .delete(synchronize_session=False)
-        )
+        deleted_wellness = db.query(Wellness).filter(Wellness.user_id == current.id).delete(synchronize_session=False)
     except Exception:
-        pass  # таблицы wellness может ещё не быть
-
-    user.total_xp = 0.0
-    user.level = 1
+        pass
+    
+    current.total_xp = 0.0
+    current.level = 1
     db.commit()
-
+    
     return {
         "message": "Все данные очищены",
         "deleted_activities": deleted_activities,
         "deleted_wellness": deleted_wellness,
         "user": {
-            "name": f"{user.firstname} {user.lastname}",
-            "level": user.level,
-            "total_xp": user.total_xp,
+            "name": current.display_name,
+            "level": current.level,
+            "total_xp": 0,
         },
+    }
+
+
+@router.get("/leaderboard")
+async def leaderboard(
+    scope: str = Query("global", regex="^(global|friends)$"),
+    limit: int = Query(50, ge=1, le=100),
+    current: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Рейтинг: global — все, friends — только принятые друзья."""
+    if scope == "global":
+        users = (
+            db.query(User)
+            .order_by(User.total_xp.desc())
+            .limit(limit)
+            .all()
+        )
+    else:
+        # друзья = accepted с обеих сторон
+        from ..models import Friendship, FriendshipStatus
+        friend_ids_rows = db.query(Friendship.to_user_id).filter(
+            Friendship.from_user_id == current.id,
+            Friendship.status == FriendshipStatus.ACCEPTED,
+        ).union(
+            db.query(Friendship.from_user_id).filter(
+                Friendship.to_user_id == current.id,
+                Friendship.status == FriendshipStatus.ACCEPTED,
+            )
+        ).all()
+        friend_ids = {r[0] for r in friend_ids_rows} | {current.id}
+        users = (
+            db.query(User)
+            .filter(User.id.in_(friend_ids))
+            .order_by(User.total_xp.desc())
+            .limit(limit)
+            .all()
+        )
+    
+    return {
+        "scope": scope,
+        "entries": [
+            {
+                "rank": i + 1,
+                "id": u.id,
+                "display_name": u.display_name,
+                "username": u.username,
+                "level": u.level,
+                "total_xp": round(float(u.total_xp or 0), 2),
+                "is_you": u.id == current.id,
+            }
+            for i, u in enumerate(users)
+        ],
     }

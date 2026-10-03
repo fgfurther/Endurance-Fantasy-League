@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import axios from "axios";
+
 import { getCachedUser, subscribeUser, refreshUser, clearUserCache } from "@/lib/apiCache";
 import type { ReactNode } from "react";
 import { Star, Sticker, DreamBubble } from "@/components/DreamBits";
+import IntervalsKeyForm from "@/components/IntervalsKeyForm";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -49,26 +50,7 @@ export default function Profile() {
     return unsub;
   }, []);
 
-  const handleSyncIntervals = async () => {
-    setSyncing(true);
-    setMessage(null);
-    try {
-      const res = await axios.post(`${API_URL}/api/sync`);
-      setMessage({
-        type: "success",
-        text: `✅ Sync done: ${res.data.synced_count} workouts · +${Math.round(res.data.new_xp)} XP`,
-      });
-      await refreshUser(true);
-    } catch {
-      setMessage({ type: "error", text: "❌ Sync error. Check that the backend is running." });
-    } finally {
-      setSyncing(false);
-    }
-  };
 
-  const handleStub = (source: string) => {
-    setMessage({ type: "info", text: `🚧 ${source} sync is under development — coming soon.` });
-  };
 
   const handleReset = async () => {
     if (!confirm("Удалить все тренировки и обнулить XP? Это действие нельзя отменить.")) return;
@@ -94,35 +76,7 @@ export default function Profile() {
     total_xp: 0,
   };
 
-  const sources = [
-    {
-      name: "Intervals.icu",
-      desc: "Strava, Garmin, Wahoo aggregator",
-      emoji: "🔌",
-      status: "connected",
-      label: "Sync →",
-      onClick: handleSyncIntervals,
-      loading: syncing,
-    },
-    {
-      name: "Garmin",
-      desc: "Direct Garmin Connect link",
-      emoji: "⌚",
-      status: "soon",
-      label: "Soon",
-      onClick: () => handleStub("Garmin"),
-      loading: false,
-    },
-    {
-      name: "Strava",
-      desc: "Direct Strava link",
-      emoji: "🚴",
-      status: "soon",
-      label: "Soon",
-      onClick: () => handleStub("Strava"),
-      loading: false,
-    },
-  ];
+
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-[#171a38] via-[#2a2f6b] to-[#5866f2] px-2 sm:px-4 md:px-6 pb-2 sm:pb-4 md:pb-6 text-[#111] relative overflow-hidden flex flex-col">
@@ -224,56 +178,40 @@ export default function Profile() {
         </div>
 
         {/* Источники данных */}
+        {/* Intervals.icu key */}
         <div className="border-b-2 border-black">
           <div className="grid md:grid-cols-[200px_1fr]">
             <div className="hidden md:flex flex-col justify-between p-5 border-r-2 border-black bg-[#5866f2] text-white">
               <div>
-                <p className="font-display uppercase text-xl md:text-2xl tracking-tight leading-none">Sources</p>
+                <p className="font-display uppercase text-xl md:text-2xl tracking-tight leading-none">Connect</p>
                 <div className="h-0.5 bg-black mt-3 mb-4"></div>
-                <Label className="block text-white/80">Connect & sync</Label>
+                <p className="block text-white/80 text-[10px] font-bold tracking-widest uppercase">Intervals.icu</p>
               </div>
               <span className="font-display text-4xl mt-auto">↓</span>
             </div>
             <div>
               <div className="md:hidden">
-                <SectionTitle tone="indigo">Sources</SectionTitle>
-              </div>
-              {sources.map((source, idx) => (
-                <div
-                  key={source.name}
-                  className={`grid grid-cols-[auto_1fr_auto] items-center ${idx > 0 ? "border-t-2 border-black" : ""}`}
-                >
-                  <div className="w-12 h-12 md:w-14 md:h-14 border-r-2 border-black flex items-center justify-center text-xl md:text-2xl bg-[#f4f4f0]">
-                    {source.emoji}
-                  </div>
-                  <div className="px-3 md:px-4 py-3 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-bold uppercase tracking-wide text-sm md:text-base">{source.name}</p>
-                      {source.status === "connected" ? (
-                        <span className="px-2 py-0.5 bg-[#5866f2] text-white text-[9px] font-bold tracking-widest uppercase">
-                          Connected
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 border border-black/30 text-[#666] text-[9px] font-bold tracking-widest uppercase">
-                          Soon
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-[#666] truncate mt-0.5">{source.desc}</p>
-                  </div>
-                  <button
-                    onClick={source.onClick}
-                    disabled={source.loading}
-                    className={`px-4 py-3 border-l-2 border-black text-[10px] md:text-xs font-bold tracking-widest uppercase transition-colors shrink-0 ${
-                      source.status === "connected"
-                        ? "bg-[#ff4b26] text-white hover:bg-[#5866f2]"
-                        : "text-[#666] hover:bg-black hover:text-white"
-                    } disabled:opacity-50`}
-                  >
-                    {source.loading ? "..." : source.label}
-                  </button>
+                <div className="px-4 py-3 border-b-2 border-black bg-[#5866f2] text-white font-display uppercase text-xl md:text-2xl tracking-tight">
+                  Connect
                 </div>
-              ))}
+              </div>
+              <div className="p-5 md:p-6">
+                <IntervalsKeyForm
+                  hasKey={userData?.user?.has_intervals_key ?? false}
+                  athleteId={userData?.user?.intervals_id ?? null}
+                />
+                <div className="mt-6 pt-5 border-t-2 border-black/10">
+                  <p className="text-[10px] font-bold tracking-widest uppercase text-[#666] mb-2">
+                    ⚡ How to get your key
+                  </p>
+                  <ol className="text-sm text-[#333] space-y-1 list-decimal list-inside">
+                    <li>Open <a href="https://intervals.icu" target="_blank" rel="noopener" className="text-[#5866f2] font-bold underline">intervals.icu</a></li>
+                    <li>Go to <b>Settings → API</b></li>
+                    <li>Copy your API key and your athlete ID (looks like iXXXXX)</li>
+                    <li>Paste both above and hit Connect</li>
+                  </ol>
+                </div>
+              </div>
             </div>
           </div>
         </div>

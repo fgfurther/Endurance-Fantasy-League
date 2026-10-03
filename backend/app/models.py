@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Index, Boolean
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Index, Boolean, Enum as SAEnum
 from sqlalchemy.orm import relationship
 from datetime import datetime
+import enum
 from .database import Base
 
 
@@ -8,25 +9,32 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    intervals_id = Column(String, unique=True, index=True, nullable=False)  # например "i12345"
-    email = Column(String, unique=True, index=True)
-    firstname = Column(String)
-    lastname = Column(String)
-    profile_picture = Column(String)
     
-    # API key (в продакшене шифровать!)
-    api_key = Column(String)
+    # Auth
+    username = Column(String(64), unique=True, index=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    display_name = Column(String(100), nullable=False)  # имя для лидерборда
+    
+    # Intervals.icu привязка (опциональна до первого sync)
+    intervals_id = Column(String, unique=True, index=True, nullable=True)
+    api_key_encrypted = Column(String(500), nullable=True)  # шифруется Fernet
+    
+    # Устаревшие поля — оставим для совместимости, но не обязательны
+    email = Column(String, unique=True, index=True, nullable=True)
+    firstname = Column(String, nullable=True)
+    lastname = Column(String, nullable=True)
+    profile_picture = Column(String, nullable=True)
     
     # Game data
     total_xp = Column(Float, default=0)
     level = Column(Integer, default=1)
     
-    
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    activities = relationship("Activity", back_populates="user")
+    activities = relationship("Activity", back_populates="user", cascade="all, delete-orphan")
+    wellness_records = relationship("Wellness", back_populates="user", cascade="all, delete-orphan")
     
     __table_args__ = (
         Index('idx_users_total_xp', 'total_xp'),
@@ -38,52 +46,44 @@ class Activity(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    intervals_activity_id = Column(String, unique=True, index=True, nullable=False)
+    intervals_activity_id = Column(String, index=True, nullable=False)
 
-    sleep_multiplier = Column(Float, default=1.0)  # множитель от продолжительности сна
-    sleep_secs = Column(Integer, nullable=True)    # сколько спали в эту ночь (для UI)
+    sleep_multiplier = Column(Float, default=1.0)
+    sleep_secs = Column(Integer, nullable=True)
     
-    # Activity data (из Intervals.icu)
     name = Column(String)
-    sport_type = Column(String)  # RIDE, RUN, SWIM, etc.
-    distance = Column(Float)  # meters
-    moving_time = Column(Integer)  # seconds
-    elapsed_time = Column(Integer)  # seconds
-    elevation_gain = Column(Float)  # meters
+    sport_type = Column(String)
+    distance = Column(Float)
+    moving_time = Column(Integer)
+    elapsed_time = Column(Integer, nullable=True)
+    elevation_gain = Column(Float)
     
-    # Средняя/макс мощность и пульс
-    average_speed = Column(Float)  # m/s
-    max_speed = Column(Float)  # m/s
-    average_heartrate = Column(Float)  # bpm
-    max_heartrate = Column(Float)  # bpm
-    average_watts = Column(Float)  # мощность (для вело)
-    normalized_power = Column(Float)  # NP (для вело)
+    average_speed = Column(Float, nullable=True)
+    max_speed = Column(Float, nullable=True)
+    average_heartrate = Column(Float, nullable=True)
+    max_heartrate = Column(Float, nullable=True)
+    average_watts = Column(Float, nullable=True)
+    normalized_power = Column(Float, nullable=True)
     
-    # Тренировочная нагрузка (из Intervals)
-    training_load = Column(Float)  # TRIMP / TSS
-    intensity = Column(Float)  # IF (Intensity Factor)
+    training_load = Column(Float, nullable=True)
+    intensity = Column(Float, nullable=True)
     
-    # Calculated game data (ВСЁ ДОЛЖНО БЫТЬ ЗДЕСЬ!)
     xp_earned = Column(Float, default=0)
-    base_xp = Column(Float, default=0)  # <-- ПЕРЕНЕСЛИ СЮДА
-    intensity_multiplier = Column(Float, default=1.0)  # <-- ПЕРЕНЕСЛИ СЮДА
+    base_xp = Column(Float, default=0)
+    intensity_multiplier = Column(Float, default=1.0)
     
     start_date = Column(DateTime)
-    start_date_local = Column(DateTime)
+    start_date_local = Column(DateTime, nullable=True)
     
-    # Indoor/outdoor
     indoor = Column(Boolean, default=False)
-    
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    # Relationships
     user = relationship("User", back_populates="activities")
     
     __table_args__ = (
         Index('idx_activities_user_date', 'user_id', 'start_date'),
-        Index('idx_activities_intervals_id', 'intervals_activity_id'),
+        Index('idx_activities_intervals_id', 'user_id', 'intervals_activity_id', unique=True),
     )
-
 
 
 class Wellness(Base):
@@ -91,7 +91,7 @@ class Wellness(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    date = Column(String, nullable=False, index=True)  # YYYY-MM-DD из Intervals (поле id)
+    date = Column(String, nullable=False, index=True)
 
     sleep_secs = Column(Integer, nullable=True)
     sleep_score = Column(Float, nullable=True)
@@ -107,14 +107,36 @@ class Wellness(Base):
     weight = Column(Float, nullable=True)
     ctl = Column(Float, nullable=True)
     atl = Column(Float, nullable=True)
-
-    # XP за сон (если начисляем)
     sleep_xp = Column(Float, default=0.0)
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    user = relationship("User", backref="wellness_records")
+    user = relationship("User", back_populates="wellness_records")
 
     __table_args__ = (
         Index("idx_wellness_user_date", "user_id", "date", unique=True),
+    )
+
+
+class FriendshipStatus(str, enum.Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+
+
+class Friendship(Base):
+    __tablename__ = "friendships"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    from_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    to_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    status = Column(SAEnum(FriendshipStatus), default=FriendshipStatus.PENDING, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    from_user = relationship("User", foreign_keys=[from_user_id])
+    to_user = relationship("User", foreign_keys=[to_user_id])
+    
+    __table_args__ = (
+        Index("idx_friendship_unique", "from_user_id", "to_user_id", unique=True),
+        Index("idx_friendship_status", "status"),
     )

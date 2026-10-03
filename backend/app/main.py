@@ -5,31 +5,25 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base
 from .config import get_settings
-from .routers import sync
+from .routers import sync, auth, intervals_key
 
-
-
-# Создаем таблицы
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Fantasy League for Endurance Athletes",
     description="API для геймифицированной спортивной платформы (Intervals.icu)",
-    version="0.1.0"
+    version="0.2.0",
 )
 
 settings = get_settings()
 
-# CORS для фронтенда
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "https://endurance-fantasy-league.vercel.app",  # ← Твой домен
-        "https://vercel.com/ridemachine/endurance-fantasy-league/C1FLpfiyAeP8yGZfDtXFWXgWQsPd",  # ← Превью домен
-        # Vercel создаёт уникальные URL для каждого коммита, используем wildcard:
-        "https://*.vercel.app",  
+        "https://endurance-fantasy-league.vercel.app",
+        "https://*.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -37,13 +31,16 @@ app.add_middleware(
 )
 
 app.include_router(sync.router)
+app.include_router(auth.router)
+app.include_router(intervals_key.router)
+
 
 @app.get("/")
 async def root():
     return {
-        "message": "Fantasy League API is running! ",
-        "version": "0.1.0",
-        "data_source": "Intervals.icu"
+        "message": "Fantasy League API is running!",
+        "version": "0.2.0",
+        "data_source": "Intervals.icu (per-user)",
     }
 
 
@@ -54,9 +51,7 @@ async def health_check():
 
 @app.get("/config-check")
 async def config_check():
-    """Проверка, что конфиг загрузился"""
     return {
         "api_url": settings.INTERVALS_API_URL,
-        "athlete_id": settings.INTERVALS_ATHLETE_ID,
-        "has_api_key": bool(settings.INTERVALS_API_KEY)
+        "has_secret_key": bool(settings.SECRET_KEY),
     }

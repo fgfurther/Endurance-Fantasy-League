@@ -21,14 +21,14 @@ export default function ActivityCard({ act }: { act: Activity }) {
 
   const multiplier = act.intensity_multiplier || 1.0;
   const multiplierColor =
-    multiplier >= 1.2 ? "text-[#ff4b26]" :
-    multiplier >= 1.0 ? "text-black" :
-    multiplier >= 0.7 ? "text-[#666]" : "text-[#5866f2]";
+    multiplier >= 0.7 ? "text-[#ff4b26]" :
+    multiplier >= 0.5 ? "text-black" :
+    multiplier >= 0.3 ? "text-[#666]" : "text-[#5866f2]";
 
   const multiplierLabel =
-    multiplier >= 1.2 ? "HIGH" :
-    multiplier >= 1.0 ? "MEDIUM" :
-    multiplier >= 0.7 ? "LOW" : "RECOVERY";
+    multiplier >= 0.7 ? "HIGH" :
+    multiplier >= 0.5 ? "MEDIUM" :
+    multiplier >= 0.3 ? "LOW" : "RECOVERY";
 
   const sleepMult = Number(act.sleep_multiplier ?? 1);
 

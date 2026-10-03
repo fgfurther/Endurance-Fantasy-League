@@ -1,13 +1,12 @@
-import axios from "axios";
+import { authApi, isAuthenticated, clearAuth } from "@/lib/auth";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const KEY = "fl_user_cache";
 
 let cache: any = null;
 try {
-  const raw = typeof localStorage !== "undefined" ? localStorage.getItem(KEY) : null;
+  const raw = typeof window !== "undefined" ? localStorage.getItem(KEY) : null;
   if (raw) cache = JSON.parse(raw);
-} catch { /* приватный режим / битые данные — игнорим */ }
+} catch {}
 
 const listeners = new Set<(d: any) => void>();
 const emit = () => listeners.forEach((l) => l(cache));
@@ -25,21 +24,36 @@ export function clearUserCache() {
 
 let inflight: Promise<any> | null = null;
 
-// Один запрос на всех: дашборд, профиль и прегрев не спамят Render
 export function refreshUser(force = false): Promise<any> {
+  if (!isAuthenticated()) {
+    // нет токена — не запрашиваем API
+    cache = null;
+    emit();
+    return Promise.resolve(null);
+  }
   if (!force && inflight) return inflight;
-  inflight = axios
-    .get(`${API_URL}/api/user`)
+  
+  inflight = authApi
+    .get(`/api/user`)
     .then((r) => {
       cache = r.data;
       try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch {}
       emit();
       return cache;
     })
-    .catch(() => cache) // сеть легла — держим старый кэш, не роняем UI
+    .catch((err) => {
+      // если 401 — interceptor уже редиректит, просто возвращаем null
+      if (err.response?.status === 401) {
+        clearAuth();
+        cache = null;
+        emit();
+        return null;
+      }
+      return cache;
+    })
     .finally(() => { inflight = null; });
+  
   return inflight;
 }
 
-// Будит Render и наполняет кэш, пока юзер ещё на главной
 export function warmup() { refreshUser(); }
