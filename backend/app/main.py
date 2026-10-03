@@ -9,6 +9,26 @@ from .routers import sync, auth, intervals_key
 
 Base.metadata.create_all(bind=engine)
 
+# Автоматическая миграция при старте (добавляет колонки если их нет)
+from sqlalchemy import text, inspect
+with engine.begin() as conn:
+    inspector = inspect(engine)
+    cols = [c["name"] for c in inspector.get_columns("users")]
+    
+    if "username" not in cols:
+        conn.execute(text("ALTER TABLE users ADD COLUMN username VARCHAR(64)"))
+    if "password_hash" not in cols:
+        conn.execute(text("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)"))
+    if "display_name" not in cols:
+        conn.execute(text("ALTER TABLE users ADD COLUMN display_name VARCHAR(100)"))
+    if "api_key_encrypted" not in cols:
+        conn.execute(text("ALTER TABLE users ADD COLUMN api_key_encrypted VARCHAR(500)"))
+    
+    conn.execute(text("ALTER TABLE users ALTER COLUMN intervals_id DROP NOT NULL"))
+    conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username)"))
+
+print("✅ Auto-migration complete")
+
 app = FastAPI(
     title="Fantasy League for Endurance Athletes",
     description="API для геймифицированной спортивной платформы (Intervals.icu)",
