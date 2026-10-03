@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { Star, Sticker, DreamBubble } from "@/components/DreamBits";
 import IntervalsKeyForm from "@/components/IntervalsKeyForm";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 
 type Tone = "default" | "yellow" | "orange" | "indigo" | "red";
 
@@ -57,7 +57,7 @@ export default function Profile() {
     setResetting(true);
     setMessage(null);
     try {
-      await axios.delete(`${API_URL}/api/reset`);
+      await authApi.delete(`/api/reset`);;
       clearUserCache(); // сбрасываем и кэш, иначе вернётся старый XP
       setMessage({ type: "success", text: "🗑 Data cleared." });
     } catch {
