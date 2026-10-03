@@ -54,6 +54,9 @@ app.include_router(sync.router)
 app.include_router(auth.router)
 app.include_router(intervals_key.router)
 
+from .routers import admin
+app.include_router(admin.router)
+
 
 @app.get("/")
 async def root():
